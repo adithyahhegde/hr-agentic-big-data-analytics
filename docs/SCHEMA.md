@@ -1,5 +1,9 @@
 # Canonical HR Schema
 
+## Implemented mapping subset
+
+The foundation recognizes only `employee_id`, `department`, `job_role`, `age`, `tenure_years`, `salary`, `performance_rating`, `attrition`, and `overtime` via explicit aliases. Every other source field remains `unknown`; this is intentional. Alias match is evidence, not a permanent user-confirmed schema version. An `attrition` candidate gains binary-value evidence only for a known binary representation.
+
 ## Purpose
 Define a stable internal vocabulary so source datasets can use different names without forcing downstream analytics code to know every vendor-specific spelling.
 

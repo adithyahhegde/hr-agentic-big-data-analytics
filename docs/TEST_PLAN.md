@@ -9,6 +9,12 @@
 - Metric selection.
 - Tool input/output contracts.
 
+## Implemented foundation tests
+
+- Empty/invalid UTF-8 and duplicate trimmed headers are rejected.
+- Alias mapping emits field, confidence, and evidence.
+- Canonical-field collisions change the mapping decision to review and emit a blocking issue.
+
 ## Integration tests
 - Upload → profiling.
 - Profiling → schema mapping.

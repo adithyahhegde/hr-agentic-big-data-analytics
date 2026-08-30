@@ -1,5 +1,11 @@
 # Application Flow
 
+## Implemented foundation path
+
+`Dataset intake → CSV validation → deterministic profile → mapping proposal/collision check → schema-review state`
+
+The current screen exposes upload, success, validation error, profile, and warning states. It does not imply that mappings have been accepted; `NEEDS_REVIEW` and `UNMAPPED` must halt dependent objectives.
+
 ## Primary flow
 1. Landing/dashboard
 2. Create analysis project

@@ -1,20 +1,20 @@
 # Implementation Plan
 
 ## Phase 0 — Research and contracts
-- [ ] Complete literature/product gap review.
-- [ ] Freeze MVP requirements.
-- [ ] Validate architecture and canonical schema.
+- [x] Complete evidence-checked, no-claim research-gap review.
+- [x] Freeze MVP requirements in `MVP_SPEC.md`.
+- [x] Define agent and API/tool contracts in `AGENT_ENGINE.md` and `API_CONTRACTS.md`.
 
 ## Phase 1 — Repository foundation
-- [ ] Backend skeleton.
-- [ ] Frontend skeleton.
-- [ ] Configuration and environment management.
-- [ ] Basic health checks.
+- [x] Backend skeleton.
+- [x] Frontend skeleton.
+- [x] Configuration and environment management.
+- [x] Basic health checks.
 
 ## Phase 2 — Data ingestion and profiling
-- [ ] CSV upload.
-- [ ] File validation.
-- [ ] Dataset profiling.
+- [x] CSV upload (request-scoped only).
+- [x] File validation.
+- [x] Deterministic dataset profiling.
 - [ ] Data-quality report.
 
 ## Phase 3 — Semantic schema layer
@@ -71,3 +71,7 @@
 
 ## Definition of done
 A phase is complete only when implementation, tests, documentation, and known limitations agree. The agent must update the relevant docs in the same change set.
+
+## Foundation release (0.1.0)
+
+Implemented `GET /api/health` and `POST /api/datasets/profile`, deterministic alias/value-pattern mapping, collision review gates, and a minimal intake UI. Spark, persistence, local LLM, objective feasibility, agent execution, and ML are deliberately not implemented. See `MVP_SPEC.md` and `API_CONTRACTS.md`.

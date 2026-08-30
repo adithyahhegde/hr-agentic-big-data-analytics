@@ -63,3 +63,7 @@ Stitch may be used for exploration and visual prototyping. Generated designs mus
 
 ## Status
 Initial design direction. Detailed tokens and component specifications will be added before production UI implementation.
+
+## Foundation UI implementation
+
+The intake screen uses a restrained document-like layout, a single action, semantic table, responsive stylesheet, and explicit progress/error/warning text. It intentionally omits gradients, decorative AI visuals, and generic dashboard-card patterns. Mapping status is textually explicit; no critical meaning depends only on colour.

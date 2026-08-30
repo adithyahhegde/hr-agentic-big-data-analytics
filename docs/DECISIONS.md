@@ -35,7 +35,18 @@ Column-name normalization alone is insufficient. Mapping may use aliases, dataty
 
 Use Pandas for genuinely small workloads when appropriate and Spark for workloads where scalable processing is beneficial. Thresholds must be benchmarked rather than arbitrarily asserted.
 
+## ADR-008 — Deterministic, non-persistent intake foundation
+**Status:** Accepted for foundation release
+
+The first executable slice keeps uploaded CSV content in request memory only, validates it before profiling, and uses deterministic aliases/value patterns for mapping proposals. Local LLM use, persistence, and Spark are deferred so the project can establish safe contract boundaries before adding asynchronous or distributed behavior.
+
+## ADR-009 — Contract-first agent integration
+**Status:** Accepted
+
+The agent/tool interface is documented before the agent implementation. Every tool must return validated structured data plus warnings and provenance. This preserves the separation between orchestration, computation, and language synthesis.
+
 ## Pending decisions
+
 - Agent framework.
 - Exact local LLM model.
 - PostgreSQL vs SQLite for MVP deployment.

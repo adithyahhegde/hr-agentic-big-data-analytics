@@ -1,5 +1,9 @@
 # Schema Understanding & Analytical Capability Engine
 
+## Foundation implementation alignment
+
+The implemented stage is deterministic structural profiling and alias/value-pattern proposal. It includes source-name normalization, type/cardinality/missingness profiling, bounded samples, unknown-field preservation, and canonical collision detection. Relationship evidence, LLM fallback, capability detection, version persistence, and drift comparison remain planned and must not be described as active behavior.
+
 ## 1. Purpose
 
 The Schema Engine is the bridge between an arbitrary HR dataset and the autonomous analytics pipeline. It must infer meaning from evidence without assuming that source column names are standard, and it must refuse to make unsupported semantic claims.
