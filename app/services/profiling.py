@@ -4,7 +4,7 @@ from collections import Counter
 import re
 
 from app.models import ColumnProfile, DatasetProfile, Issue, MappingCandidate, Severity
-from app.services.data_quality import compute_numeric_stats, generate_data_quality_report
+from app.services.data_quality import compute_numeric_stats, generate_data_quality_report_for_rows
 
 CANONICAL_ALIASES = {
     "employee_id": {"employee_id", "employeeid", "emp_id", "emp_no", "employee_no", "staff_id"},
@@ -125,7 +125,7 @@ def profile_dataset(headers: list[str], rows: list[dict[str, str]]) -> DatasetPr
                 )
             )
 
-    dq_report, all_issues = generate_data_quality_report(
+    dq_report, all_issues = generate_data_quality_report_for_rows(
         headers=headers,
         rows=rows,
         columns=columns,

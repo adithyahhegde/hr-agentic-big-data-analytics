@@ -436,16 +436,44 @@ Check:
 
 ## 16. Data-quality gate
 
-Use explicit machine-readable validation results before analysis. Established data-quality systems use declarative expectations for schema, types, presence, ranges, cardinality, and other conditions; our implementation can use the same principle without making Great Expectations a mandatory runtime dependency. citeturn0search1turn0search3
+Use explicit machine-readable validation results before analysis. Established data-quality systems use declarative expectations for schema, types, presence, ranges, cardinality, and other conditions; our implementation uses deterministic checks without making external heavy frameworks a mandatory runtime dependency.
 
-Validation severity:
+### Validation severity
 
-- `INFO` — informational
-- `WARNING` — analysis may continue with visible limitation
-- `BLOCKING` — required prerequisite is not satisfied
-- `CRITICAL` — validation itself failed or integrity cannot be trusted
+- `INFO` — informational observations (e.g. clean column variance, passed uniqueness checks).
+- `WARNING` — analysis may continue with visible limitation (e.g. high missingness >20%, duplicate rows, domain range outliers).
+- `BLOCKING` — required prerequisite is not satisfied or collision/integrity failure is present (e.g. critical missingness >80%, duplicate identifiers, negative compensation).
+- `CRITICAL` — dataset integrity cannot be trusted or dataset is empty (e.g. 0 data rows, corrupted structure).
 
 The distinction between validation failure and validation execution failure must be preserved.
+
+### Dataset Health Score methodology
+
+The Dataset Health Score ($0.0 - 100.0$) is a deterministic **engineering quality indicator** summarizing structural data health. It is not a percentage of analytical truth, ground truth, or statistical accuracy.
+
+1. **Score components & weights**:
+   - **Completeness ($40\%$)**: $40 \times \text{completeness\_rate}$ (where $\text{completeness\_rate} = 1.0 - \frac{\text{missing\_cells}}{\text{total\_cells}}$).
+   - **Uniqueness ($20\%$)**: $20 \times (1.0 - \text{duplicate\_row\_rate})$.
+   - **Clean rows ($20\%$)**: $20 \times \text{clean\_row\_rate}$ (fraction of rows with no missing or blank values).
+   - **Baseline integrity ($20\%$)**: Base 20 points minus severity-based deductions:
+     - Each `CRITICAL` issue: $-20$ points.
+     - Each `BLOCKING` issue: $-10$ points.
+     - Each `WARNING` issue: $-2$ points.
+   - Final score is bounded between $0.0$ and $100.0$, rounded to 1 decimal place.
+
+2. **Score interpretation**:
+   - `80.0 - 100.0` (Good): High structural completeness, distinct records, standard domain sanity checks satisfied.
+   - `50.0 - 79.9` (Moderate): Acceptable for exploratory analysis, but contains missing values, duplicates, or non-critical anomalies.
+   - `0.0 - 49.9` (Requires Attention): Heavy data defects, blocking issues, or severe structural corruption.
+
+3. **Engine-agnostic architecture**:
+   - Computations depend on aggregated summary statistics (`DatasetSummaryStats` and `ColumnProfile`) rather than requiring all rows in Python memory. This keeps the design compatible with future Spark and streaming engines where statistics are computed via distributed transformations.
+
+4. **Sampled PII signal semantics**:
+   - Sensitive and PII detection (email, phone, SSN / national ID patterns) is executed as a heuristic pattern scan on bounded sample values.
+   - A passing result means no patterns were detected in the analyzed sample; it does **not** guarantee the absence of sensitive data across the entire dataset.
+   - Raw sensitive values are never logged, persisted, or returned in user-facing error messages.
+
 
 ## 17. Failure and fallback policy
 

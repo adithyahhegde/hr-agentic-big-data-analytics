@@ -16,7 +16,8 @@
 - Canonical-field collisions change the mapping decision to review and emit a blocking issue.
 - Schema acceptance rejects duplicate canonical-field assignments and returns explained preliminary capability decisions.
 - A user can correct an unknown source field to a supported canonical HR field; browser rendering uses DOM text nodes for uploaded headers rather than injecting them as HTML.
-- Data Quality Engine tests verify deterministic numeric profiling (min, max, mean, zero/negative counts), PII/sensitive pattern signals (email, phone, SSN), domain validations (negative compensation, out-of-range age, tenure outliers), duplicate identifiers, completeness gates (>20%, >80%), empty row detection, and composite dataset health scoring (0-100).
+- Data Quality Engine tests verify deterministic numeric profiling (min, max, mean, zero/negative counts), sampled PII/sensitive pattern signals (email, phone, SSN) with explicit non-guarantee semantics, configurable domain validations (negative compensation, out-of-range age, tenure outliers), duplicate identifiers, completeness gates (>20%, >80%), empty row detection, single-row handling, all-null columns, and composite dataset health scoring (0-100).
+
 
 
 ## Integration tests

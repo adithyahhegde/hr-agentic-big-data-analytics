@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from app.models import ColumnProfile, Severity, RuleStatus
 from app.services.data_quality import (
+    DataQualityConfig,
+    DatasetSummaryStats,
     compute_numeric_stats,
     detect_pii_signals,
     evaluate_domain_validity,
     generate_data_quality_report,
+    generate_data_quality_report_for_rows,
+    summarize_in_memory_dataset,
 )
 from app.services.profiling import profile_dataset
 
@@ -41,6 +45,28 @@ def test_detect_pii_signals():
     assert detect_pii_signals("job_role", clean_roles) == []
 
 
+def test_sampled_pii_semantics_and_no_raw_exposure():
+    # Verify no raw PII is exposed in messages and that sample semantics are explicit
+    headers = ["emp_id", "email"]
+    rows = [{"emp_id": "1", "email": "confidential_ceo@enterprise.org"}]
+    profile = profile_dataset(headers, rows)
+    assert profile.data_quality is not None
+    pii_rule = next(r for r in profile.data_quality.rules if r.rule_name == "pii_detection")
+    assert pii_rule.status == RuleStatus.warning
+    # Ensure confidential value itself is not in message
+    assert "confidential_ceo@enterprise.org" not in pii_rule.message
+    assert "email_address" in pii_rule.message
+    assert "sampled" in pii_rule.message.lower()
+
+    # Clean dataset explicitly notes sampling limitation
+    clean_headers = ["emp_id", "job_role"]
+    clean_rows = [{"emp_id": "1", "job_role": "Analyst"}]
+    clean_profile = profile_dataset(clean_headers, clean_rows)
+    clean_pii_rule = next(r for r in clean_profile.data_quality.rules if r.rule_name == "pii_detection")
+    assert clean_pii_rule.status == RuleStatus.passed
+    assert "does not guarantee absence" in clean_pii_rule.message.lower()
+
+
 def test_evaluate_domain_validity_negative_salary():
     findings = evaluate_domain_validity("salary", "salary", ["50000", "-1000", "60000"])
     assert len(findings) == 1
@@ -69,6 +95,28 @@ def test_evaluate_domain_validity_tenure():
     findings_high = evaluate_domain_validity("tenure_years", "tenure_years", ["85", "5"])
     assert len(findings_high) == 1
     assert findings_high[0][1] == "HIGH_TENURE_OUTLIER"
+
+
+def test_configurable_hr_thresholds():
+    custom_config = DataQualityConfig(
+        min_age_heuristic=21.0,
+        max_age_heuristic=60.0,
+        max_tenure_heuristic=35.0,
+        allow_negative_salary=True,
+    )
+    # Age 62 is invalid under max_age_heuristic=60
+    findings = evaluate_domain_validity("age", "age", ["62"], config=custom_config)
+    assert len(findings) == 1
+    assert findings[0][1] == "AGE_OUT_OF_RANGE"
+
+    # Age 19 is invalid under min_age_heuristic=21
+    findings_young = evaluate_domain_validity("age", "age", ["19"], config=custom_config)
+    assert len(findings_young) == 1
+    assert findings_young[0][1] == "AGE_OUT_OF_RANGE"
+
+    # Negative salary permitted when configured
+    findings_salary = evaluate_domain_validity("salary", "salary", ["-500"], config=custom_config)
+    assert len(findings_salary) == 0
 
 
 def test_data_quality_report_empty_rows():
@@ -151,3 +199,68 @@ def test_clean_dataset_has_high_health_score():
     assert profile.data_quality.metrics.clean_row_rate == 1.0
     assert profile.data_quality.metrics.completeness_rate == 1.0
     assert profile.data_quality.metrics.duplicate_row_rate == 0.0
+
+
+def test_empty_dataset_handling():
+    summary_stats = DatasetSummaryStats(row_count=0, column_count=2)
+    columns = [
+        ColumnProfile(
+            source_name="emp_id",
+            normalized_name="emp_id",
+            inferred_type="unknown",
+            non_null_count=0,
+            null_count=0,
+            missing_percentage=0.0,
+            unique_count=0,
+            uniqueness_ratio=0.0,
+        )
+    ]
+    report, issues = generate_data_quality_report(columns, summary_stats)
+    assert report.health_score == 0.0
+    assert any(i.code == "EMPTY_DATASET" for i in issues)
+
+
+def test_single_row_dataset_handling():
+    headers = ["emp_id", "department", "salary"]
+    rows = [{"emp_id": "E1", "department": "Engineering", "salary": "75000"}]
+    profile = profile_dataset(headers, rows)
+    assert profile.row_count == 1
+    assert profile.data_quality is not None
+    assert profile.data_quality.health_score >= 80.0
+    assert profile.data_quality.metrics.clean_row_count == 1
+
+
+def test_all_null_column_and_constant_column():
+    headers = ["emp_id", "empty_col", "constant_col"]
+    rows = [
+        {"emp_id": "1", "empty_col": "", "constant_col": "Same"},
+        {"emp_id": "2", "empty_col": "", "constant_col": "Same"},
+        {"emp_id": "3", "empty_col": "", "constant_col": "Same"},
+    ]
+    profile = profile_dataset(headers, rows)
+    assert profile.data_quality is not None
+    col_map = {c.source_name: c for c in profile.columns}
+    assert col_map["empty_col"].missing_percentage == 1.0
+    assert col_map["empty_col"].numeric_stats is None
+    assert col_map["constant_col"].unique_count == 1
+    assert profile.data_quality.metrics.constant_column_count >= 1
+
+
+def test_large_synthetic_input_performance():
+    headers = ["emp_id", "department", "salary", "age"]
+    rows = [
+        {
+            "emp_id": f"EMP_{i}",
+            "department": "Engineering" if i % 2 == 0 else "Sales",
+            "salary": str(50000 + (i % 100) * 500),
+            "age": str(22 + (i % 40)),
+        }
+        for i in range(2500)
+    ]
+    summary = summarize_in_memory_dataset(headers, rows)
+    assert summary.row_count == 2500
+    assert summary.clean_row_count == 2500
+    assert summary.duplicate_row_count == 0
+    profile = profile_dataset(headers, rows)
+    assert profile.data_quality is not None
+    assert profile.data_quality.health_score >= 95.0
