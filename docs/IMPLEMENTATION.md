@@ -5,6 +5,7 @@
 - [x] Freeze MVP requirements in `MVP_SPEC.md`.
 - [x] Define agent and API/tool contracts in `AGENT_ENGINE.md` and `API_CONTRACTS.md`.
 
+
 ## Phase 1 — Repository foundation
 - [x] Backend skeleton.
 - [x] Frontend skeleton.
@@ -15,7 +16,7 @@
 - [x] CSV upload (request-scoped only).
 - [x] File validation.
 - [x] Deterministic dataset profiling.
-- [ ] Data-quality report.
+- [x] Data-quality report.
 
 ## Phase 3 — Semantic schema layer
 - [ ] Canonical HR schema.

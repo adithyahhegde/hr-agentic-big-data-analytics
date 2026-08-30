@@ -8,6 +8,13 @@ class Severity(str, Enum):
     info = "INFO"
     warning = "WARNING"
     blocking = "BLOCKING"
+    critical = "CRITICAL"
+
+
+class RuleStatus(str, Enum):
+    passed = "PASSED"
+    warning = "WARNING"
+    failed = "FAILED"
 
 
 class Issue(BaseModel):
@@ -17,14 +24,25 @@ class Issue(BaseModel):
     column: str | None = None
 
 
+class NumericStats(BaseModel):
+    min: float | None = None
+    max: float | None = None
+    mean: float | None = None
+    zeros_count: int = 0
+    negatives_count: int = 0
+
+
 class ColumnProfile(BaseModel):
     source_name: str
     normalized_name: str
     inferred_type: str
     non_null_count: int
     null_count: int
+    missing_percentage: float = 0.0
     unique_count: int
+    uniqueness_ratio: float = 0.0
     sample_values: list[str] = Field(default_factory=list)
+    numeric_stats: NumericStats | None = None
 
 
 class MappingCandidate(BaseModel):
@@ -32,6 +50,35 @@ class MappingCandidate(BaseModel):
     confidence: float = Field(ge=0, le=1)
     decision: str
     evidence: list[str]
+
+
+class QualityRuleResult(BaseModel):
+    rule_name: str
+    category: str
+    status: RuleStatus
+    severity: Severity
+    message: str
+    column: str | None = None
+    metric_value: float | None = None
+    threshold: float | None = None
+
+
+class DataQualityMetrics(BaseModel):
+    total_cells: int
+    missing_cells: int
+    completeness_rate: float
+    duplicate_row_count: int
+    duplicate_row_rate: float
+    clean_row_count: int
+    clean_row_rate: float
+    constant_column_count: int
+
+
+class DataQualityReport(BaseModel):
+    health_score: float
+    metrics: DataQualityMetrics
+    rules: list[QualityRuleResult] = Field(default_factory=list)
+    summary_by_severity: dict[str, int] = Field(default_factory=dict)
 
 
 class DatasetProfile(BaseModel):
@@ -42,6 +89,7 @@ class DatasetProfile(BaseModel):
     columns: list[ColumnProfile]
     mappings: dict[str, MappingCandidate]
     issues: list[Issue]
+    data_quality: DataQualityReport | None = None
     llm_used: bool = False
 
 
@@ -59,3 +107,4 @@ class SchemaAcceptanceResponse(BaseModel):
     dataset_id: str
     mappings: dict[str, str]
     capabilities: list[Capability]
+

@@ -12,3 +12,21 @@ def test_profile_requires_review_for_mapping_collision():
     profile = profile_dataset(["emp_no", "employee_id"], [{"emp_no": "1", "employee_id": "1"}])
     assert profile.mappings["emp_no"].decision == "NEEDS_REVIEW"
     assert any(issue.code == "MAPPING_COLLISION" for issue in profile.issues)
+
+
+def test_profile_enriches_column_metrics_and_numeric_stats():
+    profile = profile_dataset(
+        ["emp_no", "age", "salary", "notes"],
+        [
+            {"emp_no": "1", "age": "30", "salary": "50000", "notes": "Active"},
+            {"emp_no": "2", "age": "40", "salary": "70000", "notes": ""},
+        ],
+    )
+    col_map = {col.source_name: col for col in profile.columns}
+    assert col_map["salary"].numeric_stats is not None
+    assert col_map["salary"].numeric_stats.mean == 60000.0
+    assert col_map["salary"].numeric_stats.min == 50000.0
+    assert col_map["salary"].numeric_stats.max == 70000.0
+    assert col_map["notes"].missing_percentage == 0.5
+    assert col_map["emp_no"].uniqueness_ratio == 1.0
+

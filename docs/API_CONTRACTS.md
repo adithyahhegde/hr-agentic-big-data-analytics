@@ -23,7 +23,7 @@ Response `200`:
 
 Preconditions: `.csv` extension, UTF-8 (BOM allowed), non-empty payload, header row, non-blank unique trimmed names, configured resource limits, and no extra row values.
 
-Response `200` contains `row_count`, `column_count`, `duplicate_row_count`, `columns`, `mappings`, `issues`, and `llm_used`. `columns[*]` includes source/normalized name, inferred type, counts, and bounded samples. `mappings[source]` has `canonical_field`, confidence `0..1`, decision, and reason codes. Validation failures are `422`; unsupported files are `415`.
+Response `200` contains `row_count`, `column_count`, `duplicate_row_count`, `columns`, `mappings`, `issues`, `data_quality`, and `llm_used`. `columns[*]` includes source/normalized name, inferred type, non-null/null counts, `missing_percentage`, `unique_count`, `uniqueness_ratio`, bounded samples, and optional `numeric_stats` (`min`, `max`, `mean`, `zeros_count`, `negatives_count`). `mappings[source]` has `canonical_field`, confidence `0..1`, decision, and reason codes. `data_quality` contains `health_score` (0-100), summary `metrics` (completeness rate, duplicate rate, clean row rate, constant columns), evaluated `rules`, and issue counts by severity. Validation failures are `422`; unsupported files are `415`.
 
 No source file, samples, or mapping is persisted in this slice.
 

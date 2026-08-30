@@ -1,5 +1,89 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HR Analytics</title><link rel="stylesheet" href="/static/styles.css"></head>
-<body><main><header><p class="eyebrow">HR analytics</p><h1>Dataset intake</h1><p>Upload a UTF-8 CSV to validate its structure, profile the data, and review deterministic HR-field candidates.</p></header>
-<section aria-labelledby="upload-heading"><h2 id="upload-heading">Upload data</h2><form id="upload-form"><label for="dataset">CSV file</label><input id="dataset" name="file" type="file" accept=".csv,text/csv" required><button type="submit">Validate and profile</button></form><p id="status" role="status"></p></section>
-<section id="result" hidden aria-live="polite"><h2>Profile</h2><div id="summary"></div><p id="mapping-summary"></p><div class="actions"><button id="continue-mappings" type="button">Continue with safe mappings</button><button id="review-mappings" type="button" class="secondary">Review mappings</button></div><details id="mapping-review"><summary>Mapping details</summary><p>Change a field only when you know its meaning. “Unknown / do not map” is always safe.</p><table><thead><tr><th>Source field</th><th>Type</th><th>Missing</th><th>Confirmed HR field</th><th>Evidence</th></tr></thead><tbody id="rows"></tbody></table><button id="accept-mappings" type="button">Use reviewed mappings</button></details><h2>Warnings</h2><ul id="issues"></ul><p id="schema-status" role="status"></p><div id="capabilities" hidden><h2>Preliminary feasible analyses</h2><ul id="capability-list"></ul></div></section></main><script src="/static/app.js"></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HR Big Data Analytics Platform</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Autonomous HR Analytics</p>
+    <h1>Dataset Intake & Quality Assessment</h1>
+    <p>Upload a UTF-8 CSV to perform deterministic structural profiling, comprehensive data-quality assessment, and canonical HR schema mapping.</p>
+  </header>
+
+  <section aria-labelledby="upload-heading">
+    <h2 id="upload-heading">Upload Data</h2>
+    <form id="upload-form">
+      <label for="dataset">CSV file</label>
+      <input id="dataset" name="file" type="file" accept=".csv,text/csv" required>
+      <button type="submit">Validate and Profile</button>
+    </form>
+    <p id="status" role="status"></p>
+  </section>
+
+  <section id="result" hidden aria-live="polite">
+    <h2>Dataset Profile & Health</h2>
+    <div id="summary" class="metric-grid"></div>
+
+    <div id="data-quality-section">
+      <h3>Data Quality Assessment</h3>
+      <div id="dq-metrics" class="metric-grid"></div>
+      <details id="dq-rules-details">
+        <summary>Quality Rules Evaluation (<span id="dq-rule-count">0</span> rules evaluated)</summary>
+        <table>
+          <thead>
+            <tr>
+              <th>Rule</th>
+              <th>Category</th>
+              <th>Status</th>
+              <th>Finding</th>
+            </tr>
+          </thead>
+          <tbody id="dq-rules-rows"></tbody>
+        </table>
+      </details>
+    </div>
+
+    <h3>Schema Mapping</h3>
+    <p id="mapping-summary"></p>
+    <div class="actions">
+      <button id="continue-mappings" type="button">Continue with Safe Mappings</button>
+      <button id="review-mappings" type="button" class="secondary">Review Mappings</button>
+    </div>
+
+    <details id="mapping-review">
+      <summary>Mapping Details & Column Profiles</summary>
+      <p>Change a field only when you know its meaning. “Unknown / do not map” is always safe.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Source Field</th>
+            <th>Type</th>
+            <th>Missing %</th>
+            <th>Stats / Samples</th>
+            <th>Confirmed HR Field</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <button id="accept-mappings" type="button">Use Reviewed Mappings</button>
+    </details>
+
+    <h3>Warnings & Issues</h3>
+    <ul id="issues"></ul>
+    <p id="schema-status" role="status"></p>
+
+    <div id="capabilities" hidden>
+      <h2>Preliminary Feasible Analyses</h2>
+      <ul id="capability-list"></ul>
+    </div>
+  </section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>
+

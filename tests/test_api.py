@@ -22,6 +22,11 @@ def test_profile_endpoint_returns_structured_profile():
     body = response.json()
     assert body["row_count"] == 2
     assert body["mappings"]["left_org"]["canonical_field"] == "attrition"
+    assert "data_quality" in body
+    assert body["data_quality"]["health_score"] >= 90.0
+    assert body["data_quality"]["metrics"]["completeness_rate"] == 1.0
+    assert len(body["data_quality"]["rules"]) > 0
+
 
 
 def test_profile_endpoint_rejects_non_csv_file():
