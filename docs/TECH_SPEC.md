@@ -1,7 +1,9 @@
 # Technical Specification
 
 ## Architecture principle
-Use a modular, tool-driven architecture. The agent orchestrates deterministic data/ML tools; it should not perform numerical computation by language-model reasoning.
+Use a modular, tool-driven architecture. The application agent orchestrates deterministic data/ML tools; it should not perform numerical computation by language-model reasoning.
+
+The technical architecture must preserve the project's identity as an **end-to-end autonomous HR Big Data analytics and decision-support system**. Individual components such as schema interpretation, objective discovery, Spark, ML, SHAP, or the LLM are supporting mechanisms, not standalone research products.
 
 ## Proposed stack
 - Frontend: React + Vite
@@ -18,7 +20,7 @@ Use a modular, tool-driven architecture. The agent orchestrates deterministic da
 - Development agents: Antigravity/Jules/Codex as external development tooling, not application runtime dependencies
 
 ## Data paths
-Small datasets may use Pandas where it is materially simpler. Larger workloads should use Spark DataFrames and avoid unnecessary `collect()` operations.
+Small datasets may use Pandas where it is materially simpler. Larger workloads should use Spark DataFrames and avoid unnecessary `collect()` operations. The system should make the processing-path decision based on measured/defined thresholds rather than using Spark merely as a label for Big Data.
 
 ## Ingestion
 MVP: CSV upload.
@@ -28,15 +30,12 @@ Future/optional: streaming ingestion.
 ## Semantic schema layer
 Source columns are mapped to canonical HR fields using deterministic normalization and metadata first. Ambiguous cases may invoke a local LLM. Every mapping must expose confidence and validation status; low-confidence mappings require confirmation.
 
-## Analytical engine
-Supported families:
-- binary/multiclass classification;
-- regression;
-- clustering;
-- anomaly detection;
-- forecasting as a future extension.
+This layer exists to support the end-to-end analytics workflow; it is not the sole research contribution.
 
-The system selects task-appropriate evaluation metrics rather than optimizing accuracy universally.
+## Analytical objective layer
+The system should infer which supported HR analytical objectives are feasible from the profiled dataset and explain why an objective is feasible, infeasible, or uncertain. Initial objectives include classification, regression, clustering, and anomaly detection. Objective discovery must be constrained by the actual data, target availability, sample size, data types, temporal structure, and quality checks.
+
+The initial MVP still presents candidate objectives for human selection before execution. Fully autonomous objective execution is a future extension and must not bypass governance checks.
 
 ## Agent responsibilities
 The application agent is an orchestrator. It may:
@@ -46,9 +45,26 @@ The application agent is an orchestrator. It may:
 - sequence tool execution;
 - handle recoverable failures;
 - summarize structured outputs;
-- request user confirmation for ambiguous or consequential decisions.
+- request user confirmation for ambiguous or consequential decisions;
+- preserve a reproducible execution plan and provenance.
 
 The agent must not invent computed values or bypass validation.
+
+## Execution and validation
+Every analytical run should produce a structured execution record containing:
+- dataset/profile version;
+- schema mapping version;
+- selected objective;
+- planned tools and steps;
+- actual tools/steps executed;
+- model/configuration;
+- evaluation metrics;
+- data-quality warnings;
+- explainability outputs where applicable;
+- recommendation evidence;
+- timestamps/status/errors.
+
+This record supports both reproducibility and research evaluation of the complete autonomous workflow.
 
 ## Explainability
 SHAP is used for supported predictive models to attribute feature contributions. SHAP is not an LLM and does not generate natural-language reasoning by itself.
@@ -65,3 +81,6 @@ Initial target is local development on Windows. Production/cloud deployment is o
 - Validate uploaded files and source URLs.
 - Restrict file sizes and resource-intensive operations.
 - Log provenance without logging sensitive raw records.
+
+## Research constraint
+Do not introduce a technical component solely because it sounds novel. Any proposed differentiator must strengthen the end-to-end autonomous HR analytics workflow and have a measurable evaluation plan. The research gap remains provisional until the closest current systems have been inspected in sufficient depth.
