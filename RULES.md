@@ -22,3 +22,8 @@
 20. Update affected documentation whenever implementation changes its assumptions, interfaces, architecture, schema, flow, design, or limitations.
 21. Do not mark a feature complete until code, tests, and documentation are consistent.
 22. Preserve provenance: record what data, configuration, model, and tool produced an analytical result.
+23. All UI work must comply with `docs/AI_UI_DESIGN_RULES.md` and `docs/DESIGN.md`.
+24. Do not use generic AI visual tropes or marketing language merely to signal that AI is present.
+25. UI must include realistic empty, loading, validation, ambiguity, partial-success, error, and no-result states where applicable.
+26. Do not use decorative icons, gradients, glows, or other visual effects unless they have a clear product/usability purpose.
+27. Stitch or AI-generated UI output is a proposal, not an authority; reconcile it with the project's design source of truth before implementation.
