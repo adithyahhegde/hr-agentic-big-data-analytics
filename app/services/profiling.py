@@ -18,6 +18,10 @@ CANONICAL_ALIASES = {
 }
 
 
+def canonical_fields() -> set[str]:
+    return set(CANONICAL_ALIASES) | {"unknown"}
+
+
 def normalize_column_name(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
 

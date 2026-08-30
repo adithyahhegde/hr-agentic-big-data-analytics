@@ -10,13 +10,13 @@ Frozen for the foundation release. This scope refines the end-to-end HR analytic
 3. Structural validation: non-empty payload, header, non-blank/unique names, row shape, encoding, and binary-content rejection.
 4. Deterministic column and dataset profiling: inferred type, missingness, cardinality, samples, duplicate rows, and warnings.
 5. Canonical HR mapping proposals using aliases plus value-pattern evidence for supported fields.
-6. Temporary-session schema acceptance and collision detection; collisions are blocking and require review.
+6. Editable temporary-session schema review and collision detection; collisions are blocking and require review.
 7. Preliminary feasibility results for attrition classification, salary regression, clustering, and anomaly detection.
 8. A small browser interface for upload, status, profile, mapping proposal, feasibility, and warning states.
 
 ## Explicitly deferred
 
-Persistent datasets/runs, editable user mapping correction, local-LLM calls, Spark routing, agent planning, ML, SHAP, reports, and recommendations. The contracts are documented now so these stages can be added without changing the foundation’s meaning.
+Persistent datasets/runs, durable mapping reuse, local-LLM calls, Spark routing, agent planning, ML, SHAP, reports, and recommendations. The contracts are documented now so these stages can be added without changing the foundation’s meaning.
 
 ## Acceptance criteria
 

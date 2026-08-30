@@ -15,6 +15,7 @@
 - Alias mapping emits field, confidence, and evidence.
 - Canonical-field collisions change the mapping decision to review and emit a blocking issue.
 - Schema acceptance rejects duplicate canonical-field assignments and returns explained preliminary capability decisions.
+- A user can correct an unknown source field to a supported canonical HR field; browser rendering uses DOM text nodes for uploaded headers rather than injecting them as HTML.
 
 ## Integration tests
 - Upload → profiling.

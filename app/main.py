@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.models import DatasetProfile, SchemaAcceptanceRequest, SchemaAcceptanceResponse
 from app.services.capabilities import determine_capabilities
 from app.services.csv_ingestion import CsvValidationError, parse_csv
-from app.services.profiling import profile_dataset
+from app.services.profiling import canonical_fields, profile_dataset
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version="0.1.0")
@@ -49,8 +49,7 @@ def accept_schema(dataset_id: str, request: SchemaAcceptanceRequest) -> SchemaAc
     if set(request.mappings) != sources:
         raise HTTPException(status_code=422, detail="Mappings must include every source column exactly once.")
     accepted = request.mappings
-    known_fields = {candidate.canonical_field for candidate in profile.mappings.values()} | {"unknown"}
-    if not set(accepted.values()) <= known_fields:
+    if not set(accepted.values()) <= canonical_fields():
         raise HTTPException(status_code=422, detail="A mapping contains an unsupported canonical field.")
     mapped_fields = [field for field in accepted.values() if field != "unknown"]
     if len(mapped_fields) != len(set(mapped_fields)):

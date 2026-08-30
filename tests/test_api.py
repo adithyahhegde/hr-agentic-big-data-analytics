@@ -43,3 +43,10 @@ def test_schema_acceptance_rejects_duplicate_canonical_fields():
     profile = client.post("/api/datasets/profile", files={"file": ("workforce.csv", b"emp_no,dept\n1,Engineering\n", "text/csv")}).json()
     response = client.post(f"/api/datasets/{profile['dataset_id']}/schema", json={"mappings": {"emp_no": "employee_id", "dept": "employee_id"}})
     assert response.status_code == 422
+
+
+def test_schema_acceptance_allows_a_human_correction_to_a_known_field():
+    profile = client.post("/api/datasets/profile", files={"file": ("workforce.csv", b"division\nEngineering\n", "text/csv")}).json()
+    response = client.post(f"/api/datasets/{profile['dataset_id']}/schema", json={"mappings": {"division": "department"}})
+    assert response.status_code == 200
+    assert response.json()["mappings"]["division"] == "department"
