@@ -5,7 +5,6 @@
 - [x] Freeze MVP requirements in `MVP_SPEC.md`.
 - [x] Define agent and API/tool contracts in `AGENT_ENGINE.md` and `API_CONTRACTS.md`.
 
-
 ## Phase 1 — Repository foundation
 - [x] Backend skeleton.
 - [x] Frontend skeleton.
@@ -19,7 +18,7 @@
 - [x] Data-quality report.
 
 ## Phase 3 — Semantic schema layer
-- [ ] Canonical HR schema.
+- [x] Canonical HR schema.
 - [x] Deterministic mappings.
 - [x] Confidence scoring.
 - [x] Collision/ambiguity blocking at schema acceptance.
@@ -58,21 +57,3 @@
 
 ## Phase 9 — Persistence and UI
 - [ ] Analysis history.
-- [ ] Database persistence.
-- [ ] Results dashboard.
-- [ ] Export/reporting.
-
-## Phase 10 — Evaluation
-- [ ] Functional tests.
-- [ ] Schema-mapping tests.
-- [ ] Model-selection tests.
-- [ ] Scalability benchmarks.
-- [ ] Robustness tests.
-- [ ] Documentation consistency check.
-
-## Definition of done
-A phase is complete only when implementation, tests, documentation, and known limitations agree. The agent must update the relevant docs in the same change set.
-
-## Foundation release (0.1.0)
-
-Implemented `GET /api/health`, `POST /api/datasets/profile`, and temporary-session `POST /api/datasets/{dataset_id}/schema`; these provide deterministic alias/value-pattern mapping, collision review gates, preliminary feasibility, and a minimal intake UI. Spark, durable persistence, local LLM, agent execution, and ML are deliberately not implemented. See `MVP_SPEC.md` and `API_CONTRACTS.md`.
