@@ -19,9 +19,9 @@
 
 ## Phase 3 — Semantic schema layer
 - [ ] Canonical HR schema.
-- [ ] Deterministic mappings.
-- [ ] Confidence scoring.
-- [ ] Ambiguity handling.
+- [x] Deterministic mappings.
+- [x] Confidence scoring.
+- [x] Collision/ambiguity blocking at schema acceptance.
 - [ ] Optional local LLM fallback.
 
 ## Phase 4 — Big Data engine
@@ -74,4 +74,4 @@ A phase is complete only when implementation, tests, documentation, and known li
 
 ## Foundation release (0.1.0)
 
-Implemented `GET /api/health` and `POST /api/datasets/profile`, deterministic alias/value-pattern mapping, collision review gates, and a minimal intake UI. Spark, persistence, local LLM, objective feasibility, agent execution, and ML are deliberately not implemented. See `MVP_SPEC.md` and `API_CONTRACTS.md`.
+Implemented `GET /api/health`, `POST /api/datasets/profile`, and temporary-session `POST /api/datasets/{dataset_id}/schema`; these provide deterministic alias/value-pattern mapping, collision review gates, preliminary feasibility, and a minimal intake UI. Spark, durable persistence, local LLM, agent execution, and ML are deliberately not implemented. See `MVP_SPEC.md` and `API_CONTRACTS.md`.

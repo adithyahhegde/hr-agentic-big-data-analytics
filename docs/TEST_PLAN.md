@@ -14,6 +14,7 @@
 - Empty/invalid UTF-8 and duplicate trimmed headers are rejected.
 - Alias mapping emits field, confidence, and evidence.
 - Canonical-field collisions change the mapping decision to review and emit a blocking issue.
+- Schema acceptance rejects duplicate canonical-field assignments and returns explained preliminary capability decisions.
 
 ## Integration tests
 - Upload → profiling.

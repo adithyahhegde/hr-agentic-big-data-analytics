@@ -2,7 +2,7 @@
 
 ## Foundation implementation alignment
 
-The implemented stage is deterministic structural profiling and alias/value-pattern proposal. It includes source-name normalization, type/cardinality/missingness profiling, bounded samples, unknown-field preservation, and canonical collision detection. Relationship evidence, LLM fallback, capability detection, version persistence, and drift comparison remain planned and must not be described as active behavior.
+The implemented stage is deterministic structural profiling, alias/value-pattern proposal, temporary schema acceptance, and preliminary capability detection. It includes source-name normalization, type/cardinality/missingness profiling, bounded samples, unknown-field preservation, canonical collision detection, and explained eligibility checks. Relationship evidence, LLM fallback, durable version persistence, drift comparison, and model-specific feasibility validation remain planned and must not be described as active behavior.
 
 ## 1. Purpose
 

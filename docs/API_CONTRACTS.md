@@ -27,6 +27,12 @@ Response `200` contains `row_count`, `column_count`, `duplicate_row_count`, `col
 
 No source file, samples, or mapping is persisted in this slice.
 
+## Accept schema and assess feasibility
+
+`POST /api/datasets/{dataset_id}/schema` accepts `{"mappings":{"source_field":"canonical_field"}}`. A submitted mapping must name every source field exactly once, use only proposed canonical fields or `unknown`, and cannot assign one canonical field twice. The temporary profile ID is created by the profiling endpoint and expires when the process restarts.
+
+Response `200` returns the accepted mapping and four preliminary capability records: attrition classification, salary regression, employee clustering, and anomaly detection. Each is `FEASIBLE` or `BLOCKED` with human-readable reasons. This is an eligibility screen, not model validation or execution.
+
 ## Future tool envelope
 
 ```json

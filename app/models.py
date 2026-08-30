@@ -35,6 +35,7 @@ class MappingCandidate(BaseModel):
 
 
 class DatasetProfile(BaseModel):
+    dataset_id: str | None = None
     row_count: int
     column_count: int
     duplicate_row_count: int
@@ -42,3 +43,19 @@ class DatasetProfile(BaseModel):
     mappings: dict[str, MappingCandidate]
     issues: list[Issue]
     llm_used: bool = False
+
+
+class SchemaAcceptanceRequest(BaseModel):
+    mappings: dict[str, str]
+
+
+class Capability(BaseModel):
+    objective: str
+    status: str
+    reasons: list[str]
+
+
+class SchemaAcceptanceResponse(BaseModel):
+    dataset_id: str
+    mappings: dict[str, str]
+    capabilities: list[Capability]
