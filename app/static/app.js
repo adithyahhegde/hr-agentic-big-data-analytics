@@ -7,6 +7,11 @@ function optionLabel(field) { return field === 'unknown' ? 'Unknown / do not map
 
 function renderProfile(data) {
   document.querySelector('#summary').textContent = `${data.row_count} rows · ${data.column_count} columns · ${data.duplicate_row_count} duplicate rows`;
+  const candidates = Object.values(data.mappings);
+  const automatic = candidates.filter((candidate) => candidate.decision === 'AUTO_MAPPED').length;
+  const unclear = candidates.filter((candidate) => candidate.decision === 'UNMAPPED').length;
+  const conflicts = candidates.filter((candidate) => candidate.decision === 'NEEDS_REVIEW').length;
+  document.querySelector('#mapping-summary').textContent = `${automatic} fields mapped automatically · ${unclear} left unknown · ${conflicts} conflict${conflicts === 1 ? '' : 's'}`;
   const body = document.querySelector('#rows'); body.replaceChildren();
   data.columns.forEach((column) => {
     const candidate = data.mappings[column.source_name];
@@ -26,16 +31,26 @@ form.addEventListener('submit', async (event) => {
   const response = await fetch('/api/datasets/profile', { method: 'POST', body: new FormData(form) });
   const result = document.querySelector('#result');
   if (!response.ok) { const body = await response.json(); status.textContent = body.detail || 'The file could not be processed.'; result.hidden = true; return; }
-  latestProfile = await response.json(); status.textContent = 'Profile completed. Review the mappings before continuing.'; result.hidden = false; document.querySelector('#capabilities').hidden = true; renderProfile(latestProfile);
+  latestProfile = await response.json(); status.textContent = 'Profile completed. You can continue with safe mappings or review them.'; result.hidden = false; document.querySelector('#capabilities').hidden = true; document.querySelector('#mapping-review').open = false; renderProfile(latestProfile);
 });
 
-document.querySelector('#accept-mappings').addEventListener('click', async () => {
+async function submitMappings(mappings) {
   if (!latestProfile) return;
   const schemaStatus = document.querySelector('#schema-status'); schemaStatus.textContent = 'Checking confirmed mappings…';
-  const mappings = Object.fromEntries([...document.querySelectorAll('#rows select')].map((select) => [select.dataset.source, select.value]));
   const response = await fetch(`/api/datasets/${latestProfile.dataset_id}/schema`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mappings}) });
   const data = await response.json();
   if (!response.ok) { schemaStatus.textContent = data.detail || 'The mappings need review.'; return; }
   schemaStatus.textContent = 'Mappings confirmed for this temporary session.'; document.querySelector('#capabilities').hidden = false;
   const list = document.querySelector('#capability-list'); list.replaceChildren(); data.capabilities.forEach((capability) => { const item = document.createElement('li'); item.textContent = `${capability.objective}: ${capability.status} — ${capability.reasons.join(' ')}`; list.append(item); });
+}
+
+document.querySelector('#continue-mappings').addEventListener('click', () => {
+  if (!latestProfile) return;
+  submitMappings(Object.fromEntries(Object.entries(latestProfile.mappings).map(([source, candidate]) => [source, candidate.canonical_field])));
+});
+
+document.querySelector('#review-mappings').addEventListener('click', () => { document.querySelector('#mapping-review').open = true; document.querySelector('#mapping-review').scrollIntoView({behavior: 'smooth'}); });
+
+document.querySelector('#accept-mappings').addEventListener('click', () => {
+  submitMappings(Object.fromEntries([...document.querySelectorAll('#rows select')].map((select) => [select.dataset.source, select.value])));
 });

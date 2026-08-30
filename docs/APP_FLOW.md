@@ -4,7 +4,7 @@
 
 `Dataset intake → CSV validation → deterministic profile → mapping proposal/collision check → schema-review state`
 
-The current screen exposes upload, success, validation error, profile, warning, editable temporary mapping review, and preliminary feasibility states. It does not imply that mappings have been permanently accepted; a user may explicitly retain an `UNMAPPED` field and it must halt dependent objectives.
+The current screen exposes upload, success, validation error, profile, warning, automated mapping summary, optional editable temporary mapping review, and preliminary feasibility states. Its default action continues with high-confidence mappings while preserving unknown fields; mapping conflicts remain a blocking review state. It does not imply that mappings have been permanently accepted.
 
 ## Primary flow
 1. Landing/dashboard

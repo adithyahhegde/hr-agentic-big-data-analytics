@@ -67,3 +67,5 @@ Initial design direction. Detailed tokens and component specifications will be a
 ## Foundation UI implementation
 
 The intake screen uses a restrained document-like layout, a single action, semantic table, responsive stylesheet, and explicit progress/error/warning text. It intentionally omits gradients, decorative AI visuals, and generic dashboard-card patterns. Mapping status is textually explicit; no critical meaning depends only on colour.
+
+The primary schema action is “Continue with safe mappings”; detailed review is optional and collapsed by default. This keeps routine upload flows short without weakening the blocking behavior for mapping conflicts.

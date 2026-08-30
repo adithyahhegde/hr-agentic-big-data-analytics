@@ -26,6 +26,7 @@ Persistent datasets/runs, durable mapping reuse, local-LLM calls, Spark routing,
 - Unknown fields remain `UNMAPPED`; the service must not force a semantic interpretation.
 - Duplicate canonical mappings become `NEEDS_REVIEW` with a blocking issue.
 - The UI visibly presents success and error states, with no AI-marketing language or decorative AI imagery.
+- The default mapping path requires no manual interaction when all detected mappings are non-conflicting; detailed review is available on demand.
 - Unit tests cover malformed CSV, encoding, deterministic mapping, and collision behavior.
 
 ## Resource and privacy limits
