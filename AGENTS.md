@@ -14,6 +14,7 @@ Build and maintain the HR Agentic Big Data Analytics project according to the re
 8. `docs/DECISIONS.md` — architectural decisions
 9. `docs/TEST_PLAN.md` — quality requirements
 10. `RULES.md` — non-negotiable engineering rules
+11. `docs/MVP_SPEC.md`, `docs/AGENT_ENGINE.md`, and `docs/API_CONTRACTS.md` — frozen delivery, orchestration, and interface boundaries
 
 ## Required development loop
 Before a feature: inspect relevant docs and existing code.

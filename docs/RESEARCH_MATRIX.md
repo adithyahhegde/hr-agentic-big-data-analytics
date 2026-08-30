@@ -1,7 +1,7 @@
 # Research & Product Comparison Matrix
 
 ## Status
-Working literature/product review. This matrix is evidence for refining the research gap; it is not a claim of exhaustive novelty.
+Evidence-checked for implementation scoping on 2026-08-30. This matrix is not exhaustive and does not establish novelty. The primary-source checks of Data Interpreter, Microsoft Data Formulator 0.7, Oracle Data Science Agent, and SAS workforce analytics confirm that the broad product combination is already occupied; its remaining rows identify investigation targets, not verified differentiation.
 
 ## Comparison
 

@@ -6,7 +6,7 @@ Use a modular, tool-driven architecture. The application agent orchestrates dete
 The technical architecture must preserve the project's identity as an **end-to-end autonomous HR Big Data analytics and decision-support system**. Individual components such as schema interpretation, objective discovery, Spark, ML, SHAP, or the LLM are supporting mechanisms, not standalone research products.
 
 ## Proposed stack
-- Frontend: React + Vite
+- Frontend: a static HTML/CSS/JavaScript intake foundation; React + Vite remains a future option once the workflow needs client-side state and richer visualizations
 - Backend API: Python + FastAPI
 - Data processing: PySpark; Pandas for small-data paths
 - Storage format: Parquet for internal analytical datasets where practical

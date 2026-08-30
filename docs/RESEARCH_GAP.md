@@ -1,7 +1,7 @@
 # Research Gap & Novelty Review
 
 ## Status
-**OPEN — do not claim novelty yet.**
+**Evidence-checked, no novelty claim.** A 2026-08-30 refresh against primary sources—[Data Interpreter](https://aclanthology.org/2025.findings-acl.1016/), [Microsoft Data Formulator 0.7](https://www.microsoft.com/en-us/research/blog/data-formulator-0-7-ai-powered-data-analytics-for-enterprise-data/), [Oracle Data Science Agent](https://docs.oracle.com/en/database/oracle/machine-learning/data-science-agent/tasks.html), and [SAS workforce analytics](https://blogs.sas.com/content/subconsciousmusings/2026/05/29/agentic-ai-for-workforce-analytics/)—confirms material overlap. The project therefore makes no “first” or broad-combination novelty claim.
 
 The initial literature/product review confirms that the broad combination of agentic AI, HR analytics, ML and decision support already exists. The project therefore needs a narrower, testable contribution.
 
@@ -81,3 +81,7 @@ Before locking the contribution:
 ## Novelty rule
 
 Do not write “first”, “never built”, “no one has done this”, or equivalent claims unless supported by a defensible literature/product review. If an identical or substantially similar system is found, refine the contribution rather than hiding the overlap.
+
+## Research-safe implementation statement
+
+The implementation may evaluate whether confidence-aware schema interpretation, feasibility gates, constrained plans, and provenance improve reliability on defined heterogeneous HR test datasets. Until a labelled protocol and comparative results exist, this is an evaluation hypothesis, not a research contribution claim.

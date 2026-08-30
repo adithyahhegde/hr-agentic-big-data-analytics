@@ -1,0 +1,45 @@
+# API and Tool Contracts
+
+## Common rules
+
+- JSON uses UTF-8 and stable, versioned response shapes.
+- API errors are safe for users: no stack traces, raw employee records, secrets, or absolute paths.
+- Future tool responses use `{run_id, status, warnings, provenance, result}` and reject unknown fields where safety depends on the schema.
+- A mapping decision is one of `AUTO_MAPPED`, `NEEDS_REVIEW`, or `UNMAPPED`.
+
+## Health
+
+`GET /api/health`
+
+Response `200`:
+
+```json
+{"status":"ok","service":"HR Agentic Analytics","local_llm_enabled":false}
+```
+
+## Profile a CSV
+
+`POST /api/datasets/profile` uses multipart form data with exactly one `file` field.
+
+Preconditions: `.csv` extension, UTF-8 (BOM allowed), non-empty payload, header row, non-blank unique trimmed names, configured resource limits, and no extra row values.
+
+Response `200` contains `row_count`, `column_count`, `duplicate_row_count`, `columns`, `mappings`, `issues`, and `llm_used`. `columns[*]` includes source/normalized name, inferred type, counts, and bounded samples. `mappings[source]` has `canonical_field`, confidence `0..1`, decision, and reason codes. Validation failures are `422`; unsupported files are `415`.
+
+No source file, samples, or mapping is persisted in this slice.
+
+## Future tool envelope
+
+```json
+{
+  "tool": "profile_dataset",
+  "contract_version": "1.0",
+  "run_id": "uuid",
+  "input": {"dataset_id": "uuid"},
+  "resource_budget": {"timeout_seconds": 60, "max_preview_rows": 100},
+  "result": {},
+  "warnings": [],
+  "provenance": {"dataset_fingerprint": "sha256", "configuration_version": "..."}
+}
+```
+
+`result` must be schema-validated before it is consumed; this is the boundary that prevents fabricated metrics or tool outputs.
