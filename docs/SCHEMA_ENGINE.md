@@ -2,7 +2,7 @@
 
 ## Foundation implementation alignment
 
-The implemented stage is deterministic structural profiling, alias/value-pattern proposal, temporary schema acceptance, and preliminary capability detection. It includes source-name normalization, type/cardinality/missingness profiling, bounded samples, unknown-field preservation, canonical collision detection, and explained eligibility checks. Relationship evidence, LLM fallback, durable version persistence, drift comparison, and model-specific feasibility validation remain planned and must not be described as active behavior.
+The implemented stage comprises deterministic structural profiling, the M1 data-quality engine, and the **M2 Canonical HR Schema Engine**. It includes the 35-field canonical HR ontology, multi-signal evidence scoring (normalised aliases, datatype compatibility, sample value pattern checks, uniqueness/cardinality profile scoring), explicit mapping policies (`AUTO_MAPPED`, `NEEDS_REVIEW`, `UNMAPPED`), alternative candidate tracking, canonical collision resolution, order-invariant dataset fingerprinting (SHA-256), schema versioning (`2.0.0`), temporary schema acceptance, and preliminary capability detection. Relationship context evidence, LLM fallback, durable database version persistence, and multi-file drift comparison remain planned for subsequent milestones.
 
 ## 1. Purpose
 

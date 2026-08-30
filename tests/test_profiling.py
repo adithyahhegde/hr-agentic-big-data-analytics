@@ -4,8 +4,13 @@ from app.services.profiling import profile_dataset
 def test_profile_maps_known_hr_aliases_with_evidence():
     profile = profile_dataset(["emp_no", "dept", "left_org"], [{"emp_no": "1", "dept": "Engineering", "left_org": "Yes"}, {"emp_no": "2", "dept": "Sales", "left_org": "No"}])
     assert profile.mappings["emp_no"].canonical_field == "employee_id"
-    assert profile.mappings["left_org"].confidence == 0.96
-    assert "binary_value_pattern" in profile.mappings["left_org"].evidence
+    assert profile.mappings["left_org"].decision == "AUTO_MAPPED"
+    assert profile.mappings["left_org"].confidence >= 0.90
+    assert "exact_alias_match" in profile.mappings["left_org"].evidence
+    assert "value_pattern_match" in profile.mappings["left_org"].evidence
+    assert profile.schema_version == "2.0.0"
+    assert len(profile.dataset_fingerprint) == 64
+
 
 
 def test_profile_requires_review_for_mapping_collision():

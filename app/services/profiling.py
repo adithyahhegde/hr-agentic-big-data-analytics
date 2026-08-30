@@ -1,33 +1,31 @@
 from __future__ import annotations
 
-from collections import Counter
 import re
 
-from app.models import ColumnProfile, DatasetProfile, Issue, MappingCandidate, Severity
+from app.models import ColumnProfile, DatasetProfile, Issue, Severity
 from app.services.data_quality import compute_numeric_stats, generate_data_quality_report_for_rows
-
-CANONICAL_ALIASES = {
-    "employee_id": {"employee_id", "employeeid", "emp_id", "emp_no", "employee_no", "staff_id"},
-    "department": {"department", "dept", "business_unit"},
-    "job_role": {"job_role", "role", "job_title", "position"},
-    "age": {"age", "employee_age"},
-    "tenure_years": {"tenure", "tenure_years", "years_at_company", "yrs", "years_service"},
-    "salary": {"salary", "monthly_income", "annual_salary", "compensation"},
-    "performance_rating": {"performance_rating", "performance", "perf", "rating"},
-    "attrition": {"attrition", "left_org", "left_company", "terminated", "termination_flag"},
-    "overtime": {"overtime", "over_time"},
-}
+from app.services.schema_engine import (
+    CANONICAL_SCHEMA_VERSION,
+    canonical_field_names,
+    detect_collisions,
+    map_column,
+    normalize_name,
+    schema_fingerprint,
+)
 
 
 def canonical_fields() -> set[str]:
-    return set(CANONICAL_ALIASES) | {"unknown"}
+    """Public re-export used by app/main.py for schema acceptance validation."""
+    return canonical_field_names()
 
 
 def normalize_column_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+    """Compatibility alias — delegates to schema_engine.normalize_name."""
+    return normalize_name(value)
 
 
 def _infer_type(values: list[str]) -> str:
+    """Infer the physical column type from populated sample values."""
     populated = [value for value in values if value]
     if not populated:
         return "unknown"
@@ -41,23 +39,8 @@ def _infer_type(values: list[str]) -> str:
         return "categorical"
 
 
-def _mapping_for(name: str, values: list[str]) -> MappingCandidate:
-    normalized = normalize_column_name(name)
-    matches = [field for field, aliases in CANONICAL_ALIASES.items() if normalized in aliases]
-    if len(matches) == 1:
-        evidence = ["normalized_name_alias"]
-        field = matches[0]
-        confidence = 0.9
-        if field == "attrition" and {v.lower() for v in values if v} <= {"yes", "no", "y", "n", "0", "1", "true", "false"}:
-            confidence = 0.96
-            evidence.append("binary_value_pattern")
-        return MappingCandidate(canonical_field=field, confidence=confidence, decision="AUTO_MAPPED", evidence=evidence)
-    return MappingCandidate(canonical_field="unknown", confidence=0.0, decision="UNMAPPED", evidence=["no_deterministic_alias_match"])
-
-
 def profile_dataset(headers: list[str], rows: list[dict[str, str]]) -> DatasetProfile:
     columns: list[ColumnProfile] = []
-    mappings: dict[str, MappingCandidate] = {}
     base_issues: list[Issue] = []
 
     for header in headers:
@@ -71,7 +54,7 @@ def profile_dataset(headers: list[str], rows: list[dict[str, str]]) -> DatasetPr
 
         profile = ColumnProfile(
             source_name=header,
-            normalized_name=normalize_column_name(header),
+            normalized_name=normalize_name(header),
             inferred_type=_infer_type(values),
             non_null_count=non_null_count,
             null_count=null_count,
@@ -82,7 +65,6 @@ def profile_dataset(headers: list[str], rows: list[dict[str, str]]) -> DatasetPr
             numeric_stats=compute_numeric_stats(values),
         )
         columns.append(profile)
-        mappings[header] = _mapping_for(header, values)
 
         if profile.null_count:
             base_issues.append(
@@ -103,25 +85,27 @@ def profile_dataset(headers: list[str], rows: list[dict[str, str]]) -> DatasetPr
                 )
             )
 
-    collisions: dict[str, list[str]] = {}
-    for source, mapping in mappings.items():
-        if mapping.canonical_field != "unknown":
-            collisions.setdefault(mapping.canonical_field, []).append(source)
-    for field, sources in collisions.items():
-        if len(sources) > 1:
-            for source in sources:
-                mappings[source] = MappingCandidate(
-                    canonical_field=field,
-                    confidence=mappings[source].confidence,
-                    decision="NEEDS_REVIEW",
-                    evidence=mappings[source].evidence + ["canonical_mapping_collision"],
-                )
+    # M2: multi-signal mapping via schema_engine
+    raw_mappings = {col.source_name: map_column(col) for col in columns}
+
+    # M2: collision detection — multiple sources → same canonical
+    mappings = detect_collisions(raw_mappings)
+
+    # Emit MAPPING_COLLISION issues for any collisions detected
+    seen_collisions: set[str] = set()
+    for source, m in mappings.items():
+        if "canonical_mapping_collision" in m.evidence and m.canonical_field not in seen_collisions:
+            seen_collisions.add(m.canonical_field)
+            sources_in_collision = [
+                s for s, mc in mappings.items()
+                if mc.canonical_field == m.canonical_field and "canonical_mapping_collision" in mc.evidence
+            ]
             base_issues.append(
                 Issue(
                     code="MAPPING_COLLISION",
                     severity=Severity.blocking,
-                    message=f"Multiple source columns map to {field}; confirm one mapping.",
-                    column=", ".join(sources),
+                    message=f"Multiple source columns map to {m.canonical_field}; confirm one mapping.",
+                    column=", ".join(sources_in_collision),
                 )
             )
 
@@ -142,5 +126,6 @@ def profile_dataset(headers: list[str], rows: list[dict[str, str]]) -> DatasetPr
         mappings=mappings,
         issues=all_issues,
         data_quality=dq_report,
+        schema_version=CANONICAL_SCHEMA_VERSION,
+        dataset_fingerprint=schema_fingerprint(headers),
     )
-

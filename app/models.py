@@ -50,6 +50,13 @@ class MappingCandidate(BaseModel):
     confidence: float = Field(ge=0, le=1)
     decision: str
     evidence: list[str]
+    # Alternative candidate canonical fields (populated when decision is NEEDS_REVIEW)
+    alternatives: list[str] = Field(default_factory=list)
+    # Component evidence scores for transparency (each in [0, 1])
+    name_score: float = 0.0
+    type_score: float = 0.0
+    value_score: float = 0.0
+    profile_score: float = 0.0
 
 
 class QualityRuleResult(BaseModel):
@@ -91,6 +98,9 @@ class DatasetProfile(BaseModel):
     issues: list[Issue]
     data_quality: DataQualityReport | None = None
     llm_used: bool = False
+    # Schema versioning and reproducibility (SCHEMA_ENGINE.md §12)
+    schema_version: str = ""
+    dataset_fingerprint: str = ""
 
 
 class SchemaAcceptanceRequest(BaseModel):
