@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+from collections import Counter
+import re
+
+from app.models import ColumnProfile, DatasetProfile, Issue, MappingCandidate, Severity
+
+CANONICAL_ALIASES = {
+    "employee_id": {"employee_id", "employeeid", "emp_id", "emp_no", "employee_no", "staff_id"},
+    "department": {"department", "dept", "business_unit"},
+    "job_role": {"job_role", "role", "job_title", "position"},
+    "age": {"age", "employee_age"},
+    "tenure_years": {"tenure", "tenure_years", "years_at_company", "yrs", "years_service"},
+    "salary": {"salary", "monthly_income", "annual_salary", "compensation"},
+    "performance_rating": {"performance_rating", "performance", "perf", "rating"},
+    "attrition": {"attrition", "left_org", "left_company", "terminated", "termination_flag"},
+    "overtime": {"overtime", "over_time"},
+}
+
+
+def normalize_column_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+
+
+def _infer_type(values: list[str]) -> str:
+    populated = [value for value in values if value]
+    if not populated:
+        return "unknown"
+    lowered = {value.lower() for value in populated}
+    if lowered <= {"yes", "no", "y", "n", "true", "false", "0", "1"}:
+        return "boolean"
+    try:
+        [float(value) for value in populated]
+        return "numeric"
+    except ValueError:
+        return "categorical"
+
+
+def _mapping_for(name: str, values: list[str]) -> MappingCandidate:
+    normalized = normalize_column_name(name)
+    matches = [field for field, aliases in CANONICAL_ALIASES.items() if normalized in aliases]
+    if len(matches) == 1:
+        evidence = ["normalized_name_alias"]
+        field = matches[0]
+        confidence = 0.9
+        if field == "attrition" and {v.lower() for v in values if v} <= {"yes", "no", "y", "n", "0", "1", "true", "false"}:
+            confidence = 0.96
+            evidence.append("binary_value_pattern")
+        return MappingCandidate(canonical_field=field, confidence=confidence, decision="AUTO_MAPPED", evidence=evidence)
+    return MappingCandidate(canonical_field="unknown", confidence=0.0, decision="UNMAPPED", evidence=["no_deterministic_alias_match"])
+
+
+def profile_dataset(headers: list[str], rows: list[dict[str, str]]) -> DatasetProfile:
+    columns: list[ColumnProfile] = []
+    mappings: dict[str, MappingCandidate] = {}
+    issues: list[Issue] = []
+    for header in headers:
+        values = [row[header] for row in rows]
+        populated = [value for value in values if value]
+        profile = ColumnProfile(
+            source_name=header,
+            normalized_name=normalize_column_name(header),
+            inferred_type=_infer_type(values),
+            non_null_count=len(populated),
+            null_count=len(values) - len(populated),
+            unique_count=len(set(populated)),
+            sample_values=list(dict.fromkeys(populated))[:5],
+        )
+        columns.append(profile)
+        mappings[header] = _mapping_for(header, values)
+        if profile.null_count:
+            issues.append(Issue(code="MISSING_VALUES", severity=Severity.warning, message=f"{profile.null_count} values are missing.", column=header))
+        if profile.unique_count <= 1:
+            issues.append(Issue(code="CONSTANT_OR_EMPTY_COLUMN", severity=Severity.warning, message="The column has at most one populated value.", column=header))
+    duplicate_rows = sum(count - 1 for count in Counter(tuple(row[h] for h in headers) for row in rows).values() if count > 1)
+    if duplicate_rows:
+        issues.append(Issue(code="DUPLICATE_ROWS", severity=Severity.warning, message=f"{duplicate_rows} duplicate data rows were found."))
+    collisions: dict[str, list[str]] = {}
+    for source, mapping in mappings.items():
+        if mapping.canonical_field != "unknown":
+            collisions.setdefault(mapping.canonical_field, []).append(source)
+    for field, sources in collisions.items():
+        if len(sources) > 1:
+            for source in sources:
+                mappings[source] = MappingCandidate(canonical_field=field, confidence=mappings[source].confidence, decision="NEEDS_REVIEW", evidence=mappings[source].evidence + ["canonical_mapping_collision"])
+            issues.append(Issue(code="MAPPING_COLLISION", severity=Severity.blocking, message=f"Multiple source columns map to {field}; confirm one mapping.", column=", ".join(sources)))
+    return DatasetProfile(row_count=len(rows), column_count=len(headers), duplicate_row_count=duplicate_rows, columns=columns, mappings=mappings, issues=issues)
