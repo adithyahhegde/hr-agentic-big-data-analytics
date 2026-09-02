@@ -29,7 +29,8 @@
 - [x] Small/large workload routing.
 - [x] Parquet intermediate representation.
 - [x] Scalable grouped transformations.
-- [ ] End-to-end API integration of workload routing and execution.
+- [x] API-level workload routing contract.
+- [ ] End-to-end persisted dataset execution through the analytical API.
 
 ## Phase 5 — Analytics/ML engine
 - [ ] Task detection.
@@ -74,6 +75,6 @@
 A phase is complete only when implementation, tests, documentation, and known limitations agree. The agent must update the relevant docs in the same change set.
 
 ## Current status
-M0 Foundation, M1 Data Quality, M2 Canonical HR Schema, M3 optional local LLM fallback, and the core M4 Big Data execution services are implemented. M4 now has deterministic workload routing, optional Spark execution, local execution, Parquet output, and distributed-safe grouped aggregation. API-level execution integration and benchmark validation remain before Phase 4 is fully closed.
+M0 Foundation, M1 Data Quality, M2 Canonical HR Schema, M3 optional local LLM fallback, and the core M4 Big Data execution services are implemented. M4 now also exposes the deterministic routing decision through `/api/workloads/route`. The actual dataset execution path is deliberately not marked complete because the current upload/profile flow is request-scoped and bounded and does not persist the source dataset for later Spark execution.
 
-Next target: integrate the M4 execution services into the analytical API, then proceed to Phase 5 task detection and ML.
+Next target: introduce a safe dataset execution/persistence boundary, then build Phase 5 task detection and ML on top of the engine-neutral execution layer.
