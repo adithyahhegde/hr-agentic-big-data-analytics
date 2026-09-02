@@ -57,14 +57,16 @@
       <div class="panel"><div class="panel-head"><h3>Deterministic descriptive analytics</h3><span id="engine-badge" class="engine-badge"></span></div><div id="analysis-metrics" class="metric-grid compact"></div></div>
       <div class="panel"><h3>Numeric fields</h3><table><thead><tr><th>Field</th><th>Count</th><th>Minimum</th><th>Mean</th><th>Maximum</th></tr></thead><tbody id="numeric-rows"></tbody></table></div>
       <div class="panel"><h3>Categorical fields</h3><table><thead><tr><th>Field</th><th>Distinct</th><th>Most common values</th></tr></thead><tbody id="categorical-rows"></tbody></table></div>
+      <div class="panel"><div class="panel-head"><h3>Predictive modelling</h3><span class="engine-badge">Local / reproducible</span></div><p class="panel-copy">For each feasible supervised task, the engine compares multiple candidates on a held-out test set and selects the best candidate using a task-appropriate metric. Clustering and anomaly models are the next extension point.</p><div id="ml-actions" class="ml-actions"></div><div id="ml-status" class="status"></div></div>
       <div class="step-actions"><button class="primary" data-next="5">View evidence & insights</button></div>
     </section>
 
     <section id="step-5" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">05 / Evidence & insights</div><h2>What does the data actually tell us?</h2><p>Every finding below is generated from computed dataset evidence. No unsupported HR decision is made automatically.</p></div><button class="secondary" data-back="4">Back</button></div>
+      <div class="section-head"><div><div class="section-kicker">05 / Evidence & insights</div><h2>What does the data actually tell us?</h2><p>Findings are tied to computed analytics or evaluated model evidence. They are not automated employment decisions.</p></div><button class="secondary" data-back="4">Back</button></div>
       <div id="insight-list" class="insight-list"></div>
+      <div class="panel"><h3>Model evaluation</h3><div id="ml-results"></div></div>
       <div class="panel provenance"><h3>Run provenance</h3><div id="provenance"></div></div>
-      <div class="finish"><div><b>Analysis workspace ready.</b><p>The next product layer is model training, evaluation, explainability and the bounded agentic recommendation layer.</p></div><button class="secondary" onclick="location.reload()">Start another dataset</button></div>
+      <div class="finish"><div><b>Analysis workspace ready.</b><p>The agentic layer can consume these structured results to draft evidence-backed recommendations without seeing unrestricted raw HR data.</p></div><button class="secondary" onclick="location.reload()">Start another dataset</button></div>
     </section>
   </main>
 </div>
