@@ -11,70 +11,36 @@
 
 `GET /api/health`
 
-Response `200`:
-
-```json
-{"status":"ok","service":"HR Agentic Analytics","local_llm_enabled":false}
-```
+Response `200` exposes service health and whether the optional local LLM fallback is enabled.
 
 ## Profile a CSV
 
-`POST /api/datasets/profile` uses multipart form data with exactly one `file` field.
-
-Preconditions: `.csv` extension, UTF-8 (BOM allowed), non-empty payload, header row, non-blank unique trimmed names, configured resource limits, and no extra row values.
-
-Response `200` contains `row_count`, `column_count`, `duplicate_row_count`, `columns`, `mappings`, `issues`, `data_quality`, `llm_used`, `schema_version`, and `dataset_fingerprint`. This endpoint remains intentionally bounded for profiling.
-
-No source file, samples, or mapping is persisted by the profiling endpoint.
+`POST /api/datasets/profile` uses multipart form data with exactly one `file` field. The endpoint is intentionally bounded for profiling and does not persist the source file.
 
 ## Workload routing
 
-`POST /api/workloads/route` accepts workload metadata and returns the deterministic execution-path decision without loading dataset records.
-
-Request:
-
-```json
-{
-  "row_count": 1000000,
-  "column_count": 40,
-  "estimated_bytes": 200000000,
-  "file_count": 1,
-  "requires_distributed": false
-}
-```
-
-Response `200` includes the selected `engine` (`LOCAL` or `SPARK`), the supplied workload metadata, and the active routing policy. The default policy routes to Spark when the workload explicitly requires distributed processing, exceeds 1,000,000 rows, exceeds 512 MiB, exceeds 500 columns, or contains more than 32 files. These are configurable engineering defaults, not a universal definition of Big Data.
-
-This endpoint exposes routing only; it does not persist or execute a dataset.
+`POST /api/workloads/route` accepts workload metadata and returns the deterministic `LOCAL` or `SPARK` execution-path decision without loading dataset records. Thresholds are configurable engineering defaults, not a universal definition of Big Data.
 
 ## Execute a dataset
 
-`POST /api/datasets/execute` accepts one `.csv` upload. The file is streamed to process-local disk, counted without loading all records into application memory, routed using the M4 policy, and read through the selected execution engine.
-
-Response `200`:
-
-```json
-{
-  "dataset_id": "uuid",
-  "status": "EXECUTED",
-  "engine": "LOCAL",
-  "row_count": 100,
-  "column_count": 20,
-  "size_bytes": 12000,
-  "dataset_fingerprint": "sha256",
-  "warnings": []
-}
-```
-
-The execution upload has its own bounded size limit (`HR_ANALYTICS_MAX_EXECUTION_UPLOAD_BYTES`, default 2 GiB) so the profiling limit does not prevent genuine large-workload routing. Spark and local analytical dependencies remain optional installation extras. A missing selected engine dependency returns `503`; malformed uploads return `422`; unsupported extensions return `415`.
-
-The stored dataset is process-local and is not a durable database record. Later persistence work will add lifecycle management, provenance records, and analysis history.
+`POST /api/datasets/execute` accepts one `.csv` upload, streams it to process-local disk, routes it using the M4 policy, and reads it through the selected engine. The response contains dataset ID, execution status, selected engine, dimensions, byte size, and SHA-256 content fingerprint. Missing optional engine dependencies return `503`; malformed uploads return `422`; unsupported extensions return `415`.
 
 ## Accept schema and assess feasibility
 
-`POST /api/datasets/{dataset_id}/schema` accepts `{"mappings":{"source_field":"canonical_field"}}`. A submitted mapping must name every source field exactly once, use a supported canonical HR field or `unknown`, and cannot assign one canonical field twice. This permits a user correction to an otherwise unknown source field. The temporary profile ID is created by the profiling endpoint and expires when the process restarts.
+`POST /api/datasets/{dataset_id}/schema` accepts a complete canonical mapping and records the human-confirmed mapping for subsequent task detection. The existing capability response remains an eligibility screen, not model execution.
 
-Response `200` returns the accepted mapping and four preliminary capability records: attrition classification, salary regression, employee clustering, and anomaly detection. Each is `FEASIBLE` or `BLOCKED` with human-readable reasons. This is an eligibility screen, not model validation or execution.
+## Detect analytical tasks
+
+`GET /api/datasets/{dataset_id}/tasks` runs deterministic task detection **after schema confirmation**. It returns candidate objectives, status, target field where applicable, selected feature fields, and human-readable reasons.
+
+The detector currently evaluates four objective families:
+
+- `attrition_classification` — requires a confirmed attrition field, usable numeric HR features, and sufficient rows.
+- `salary_regression` — requires a confirmed salary field, usable numeric predictors, and sufficient rows.
+- `employee_clustering` — requires at least two supported numeric HR features and sufficient rows.
+- `anomaly_detection` — requires at least two supported numeric HR features and sufficient rows.
+
+The detector does not invent targets and does not train a model. A `BLOCKED` result is an explicit valid outcome rather than an error.
 
 ## Future tool envelope
 
