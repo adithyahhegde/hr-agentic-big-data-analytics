@@ -26,7 +26,6 @@ def test_profile_endpoint_returns_structured_profile():
     assert body["data_quality"]["health_score"] >= 90.0
     assert body["data_quality"]["metrics"]["completeness_rate"] == 1.0
     assert len(body["data_quality"]["rules"]) > 0
-    # M2 schema engine verification
     assert body["schema_version"] == "2.0.0"
     assert len(body["dataset_fingerprint"]) == 64
     assert "name_score" in body["mappings"]["left_org"]
@@ -78,3 +77,32 @@ def test_schema_acceptance_allows_a_human_correction_to_a_known_field():
     assert response.status_code == 200
     assert response.json()["mappings"]["division"] == "department"
     assert response.json()["mappings"]["annual_bonus"] == "bonus"
+
+
+def test_workload_route_endpoint_chooses_local_for_small_workload():
+    response = client.post(
+        "/api/workloads/route",
+        json={"row_count": 1000, "column_count": 20, "estimated_bytes": 100000},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["engine"] == "LOCAL"
+    assert body["policy"]["max_local_rows"] == 1_000_000
+
+
+def test_workload_route_endpoint_chooses_spark_for_large_workload():
+    response = client.post(
+        "/api/workloads/route",
+        json={"row_count": 2_000_000, "column_count": 20, "estimated_bytes": 100000},
+    )
+    assert response.status_code == 200
+    assert response.json()["engine"] == "SPARK"
+
+
+def test_workload_route_endpoint_honours_explicit_distributed_requirement():
+    response = client.post(
+        "/api/workloads/route",
+        json={"row_count": 100, "column_count": 5, "requires_distributed": True},
+    )
+    assert response.status_code == 200
+    assert response.json()["engine"] == "SPARK"
