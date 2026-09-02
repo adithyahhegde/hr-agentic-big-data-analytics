@@ -35,7 +35,7 @@
 - [ ] Scalability benchmark validation.
 
 ## Phase 5 — Analytics/ML engine
-- [ ] Task detection.
+- [x] Deterministic task detection.
 - [ ] Candidate model registry.
 - [ ] Training/evaluation pipelines.
 - [ ] Appropriate metrics.
@@ -77,6 +77,6 @@
 A phase is complete only when implementation, tests, documentation, and known limitations agree. The agent must update the relevant docs in the same change set.
 
 ## Current status
-M0 Foundation, M1 Data Quality, M2 Canonical HR Schema, M3 optional local LLM fallback, and the core M4 Big Data execution services are implemented. M4 now has deterministic workload routing, optional Spark execution, streamed-to-disk dataset execution, and safe API error boundaries. Durable persistence/lifecycle and benchmark validation remain intentionally open.
+M0 Foundation, M1 Data Quality, M2 Canonical HR Schema, M3 optional local LLM fallback, and the core M4 Big Data execution services are implemented. M4 has deterministic workload routing, optional Spark execution, streamed-to-disk dataset execution, and safe API error boundaries. Durable persistence/lifecycle and benchmark validation remain intentionally open.
 
-Next target: complete the minimum M4 persistence/lifecycle boundary needed by the analytics pipeline, then begin Phase 5 task detection and ML.
+Phase 5 has now started with deterministic task detection exposed through the analytical API. The detector uses confirmed canonical schema information, returns explicit FEASIBLE/BLOCKED states, does not invent targets, and does not train models. Next: candidate model registry and task-specific evaluation pipelines.
