@@ -14,6 +14,7 @@ from app.services.big_data_engine import read_csv
 from app.services.capabilities import determine_capabilities
 from app.services.csv_ingestion import CsvValidationError, parse_csv
 from app.services.dataset_store import store
+from app.services.ml_engine import run_ml
 from app.services.profiling import canonical_fields, profile_dataset
 from app.services.task_detection import detect_tasks
 from app.services.workload_router import RoutingPolicy, WorkloadProfile, route_workload
@@ -24,6 +25,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 profiles: dict[str, DatasetProfile] = {}
 accepted_mappings: dict[str, dict[str, str]] = {}
+ml_runs: dict[tuple[str, str], dict[str, object]] = {}
 
 @app.get("/api/health")
 def health() -> dict[str, object]:
@@ -90,6 +92,7 @@ def accept_schema(dataset_id: str, request: SchemaAcceptanceRequest) -> SchemaAc
     if len(mapped_fields) != len(set(mapped_fields)):
         raise HTTPException(status_code=422, detail="Each canonical field may be assigned only once. Resolve mapping collisions first.")
     accepted_mappings[dataset_id] = request.mappings
+    ml_runs.clear()
     return SchemaAcceptanceResponse(dataset_id=dataset_id, mappings=request.mappings, capabilities=determine_capabilities(request.mappings, profile.row_count))
 
 @app.get("/api/datasets/{dataset_id}/tasks", response_model=TaskDetectionResponse)
@@ -111,9 +114,34 @@ def dataset_analytics(dataset_id: str) -> dict[str, object]:
     try:
         workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
         engine = route_workload(workload)
-        return {"dataset_id": dataset_id, "engine": engine.value, **analyze_csv(dataset.path, mappings)}
+        return {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analyze_csv(dataset.path, mappings)}
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+@app.post("/api/datasets/{dataset_id}/ml/{objective}")
+def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
+    profile = profiles.get(dataset_id)
+    mappings = accepted_mappings.get(dataset_id)
+    dataset = store.get(dataset_id)
+    if profile is None or mappings is None or dataset is None:
+        raise HTTPException(status_code=409, detail="Confirm the dataset schema before running ML.")
+    task = next((task for task in detect_tasks(mappings, profile.row_count) if task.objective == objective), None)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Unknown analytical objective.")
+    if task.status != "FEASIBLE" or not task.target_field:
+        raise HTTPException(status_code=409, detail="This analytical task is currently blocked by the confirmed schema or dataset size.")
+    key = (dataset_id, objective)
+    if key in ml_runs:
+        return ml_runs[key]
+    try:
+        result = run_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields))
+        result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version})
+        ml_runs[key] = result
+        return result
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 @app.get("/")
 def index() -> FileResponse:
