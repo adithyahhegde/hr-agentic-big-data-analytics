@@ -3,87 +3,71 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HR Big Data Analytics Platform</title>
+  <title>HR Analytics Workbench</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-<main>
-  <header>
-    <p class="eyebrow">Autonomous HR Analytics</p>
-    <h1>Dataset Intake & Quality Assessment</h1>
-    <p>Upload a UTF-8 CSV to perform deterministic structural profiling, comprehensive data-quality assessment, and canonical HR schema mapping.</p>
-  </header>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">HA</span><div><strong>HR Analytics</strong><small>Decision Workbench</small></div></div>
+    <nav>
+      <div class="nav-title">WORKFLOW</div>
+      <button class="nav-step active" data-step="1"><span>01</span>Dataset</button>
+      <button class="nav-step" data-step="2"><span>02</span>Data health</button>
+      <button class="nav-step" data-step="3"><span>03</span>Schema</button>
+      <button class="nav-step" data-step="4"><span>04</span>Analysis</button>
+      <button class="nav-step" data-step="5"><span>05</span>Insights</button>
+    </nav>
+    <div class="sidebar-note"><b>Privacy first</b><br>Uploaded HR data stays local to this application by default. External AI is not required for deterministic analysis.</div>
+  </aside>
 
-  <section aria-labelledby="upload-heading">
-    <h2 id="upload-heading">Upload Data</h2>
-    <form id="upload-form">
-      <label for="dataset">CSV file</label>
-      <input id="dataset" name="file" type="file" accept=".csv,text/csv" required>
-      <button type="submit">Validate and Profile</button>
-    </form>
-    <p id="status" role="status"></p>
-  </section>
+  <main class="workspace">
+    <header class="topbar"><div><div class="eyebrow">Agentic Big Data Analytics</div><h1>HR Analytics Workbench</h1></div><div id="connection" class="connection"><i></i> System ready</div></header>
 
-  <section id="result" hidden aria-live="polite">
-    <h2>Dataset Profile & Health</h2>
-    <div id="summary" class="metric-grid"></div>
+    <section id="step-1" class="step-panel active-panel">
+      <div class="hero"><div><div class="section-kicker">01 / Dataset intake</div><h2>Start with your HR data.</h2><p>The platform profiles messy CSV data, evaluates quality, maps source fields to a canonical HR schema, detects feasible analyses, and produces evidence-backed findings.</p></div></div>
+      <form id="upload-form" class="dropzone">
+        <div class="upload-icon">↑</div><h3>Drop a CSV dataset here</h3><p>or choose a file from your device</p>
+        <input id="dataset" name="file" type="file" accept=".csv,text/csv" required>
+        <label for="dataset" class="file-button">Choose CSV</label><div id="file-name" class="file-name">No file selected</div>
+        <button type="submit" class="primary" id="analyze-upload">Profile dataset</button>
+      </form>
+      <div id="status" class="status" role="status"></div>
+    </section>
 
-    <div id="data-quality-section">
-      <h3>Data Quality Assessment</h3>
-      <div id="dq-metrics" class="metric-grid"></div>
-      <details id="dq-rules-details">
-        <summary>Quality Rules Evaluation (<span id="dq-rule-count">0</span> rules evaluated)</summary>
-        <table>
-          <thead>
-            <tr>
-              <th>Rule</th>
-              <th>Category</th>
-              <th>Status</th>
-              <th>Finding</th>
-            </tr>
-          </thead>
-          <tbody id="dq-rules-rows"></tbody>
-        </table>
-      </details>
-    </div>
+    <section id="step-2" class="step-panel" hidden>
+      <div class="section-head"><div><div class="section-kicker">02 / Data health</div><h2>Is the dataset trustworthy enough to analyse?</h2></div><button class="secondary" data-back="1">Back</button></div>
+      <div id="summary" class="metric-grid"></div>
+      <div class="panel"><div class="panel-head"><h3>Quality assessment</h3><span id="quality-label" class="status-badge"></span></div><div id="dq-metrics" class="metric-grid compact"></div></div>
+      <div class="panel"><h3>Quality rules</h3><table><thead><tr><th>Rule</th><th>Category</th><th>Status</th><th>Finding</th></tr></thead><tbody id="dq-rule-rows"></tbody></table></div>
+      <div class="step-actions"><button class="primary" data-next="3">Continue to schema</button></div>
+    </section>
 
-    <h3>Schema Mapping</h3>
-    <p id="mapping-summary"></p>
-    <div class="actions">
-      <button id="continue-mappings" type="button">Continue with Safe Mappings</button>
-      <button id="review-mappings" type="button" class="secondary">Review Mappings</button>
-    </div>
+    <section id="step-3" class="step-panel" hidden>
+      <div class="section-head"><div><div class="section-kicker">03 / Schema understanding</div><h2>Review how the platform understands your columns.</h2><p id="mapping-summary"></p></div><button class="secondary" data-back="2">Back</button></div>
+      <div class="notice">Automatic mappings use multiple evidence signals. Ambiguous fields remain reviewable. You can always choose <b>Unknown</b> rather than forcing a semantic guess.</div>
+      <div class="panel table-panel"><table><thead><tr><th>Source field</th><th>Type</th><th>Missing</th><th>Suggested field</th><th>Confidence</th><th>Evidence</th></tr></thead><tbody id="mapping-rows"></tbody></table></div>
+      <div class="step-actions"><button id="confirm-schema" class="primary">Confirm schema & detect analyses</button></div>
+      <div id="schema-status" class="status"></div>
+    </section>
 
-    <details id="mapping-review">
-      <summary>Mapping Details & Column Profiles</summary>
-      <p>Change a field only when you know its meaning. “Unknown / do not map” is always safe.</p>
-      <table>
-        <thead>
-          <tr>
-            <th>Source Field</th>
-            <th>Type</th>
-            <th>Missing %</th>
-            <th>Stats / Samples</th>
-            <th>Confirmed HR Field</th>
-            <th>Evidence</th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
-      <button id="accept-mappings" type="button">Use Reviewed Mappings</button>
-    </details>
+    <section id="step-4" class="step-panel" hidden>
+      <div class="section-head"><div><div class="section-kicker">04 / Analysis workspace</div><h2>What can this dataset support?</h2><p>Tasks are proposed only when the confirmed schema and dataset size provide sufficient evidence.</p></div><button class="secondary" data-back="3">Back</button></div>
+      <div id="task-grid" class="task-grid"></div>
+      <div class="panel"><div class="panel-head"><h3>Deterministic descriptive analytics</h3><span id="engine-badge" class="engine-badge"></span></div><div id="analysis-metrics" class="metric-grid compact"></div></div>
+      <div class="panel"><h3>Numeric fields</h3><table><thead><tr><th>Field</th><th>Count</th><th>Minimum</th><th>Mean</th><th>Maximum</th></tr></thead><tbody id="numeric-rows"></tbody></table></div>
+      <div class="panel"><h3>Categorical fields</h3><table><thead><tr><th>Field</th><th>Distinct</th><th>Most common values</th></tr></thead><tbody id="categorical-rows"></tbody></table></div>
+      <div class="step-actions"><button class="primary" data-next="5">View evidence & insights</button></div>
+    </section>
 
-    <h3>Warnings & Issues</h3>
-    <ul id="issues"></ul>
-    <p id="schema-status" role="status"></p>
-
-    <div id="capabilities" hidden>
-      <h2>Preliminary Feasible Analyses</h2>
-      <ul id="capability-list"></ul>
-    </div>
-  </section>
-</main>
+    <section id="step-5" class="step-panel" hidden>
+      <div class="section-head"><div><div class="section-kicker">05 / Evidence & insights</div><h2>What does the data actually tell us?</h2><p>Every finding below is generated from computed dataset evidence. No unsupported HR decision is made automatically.</p></div><button class="secondary" data-back="4">Back</button></div>
+      <div id="insight-list" class="insight-list"></div>
+      <div class="panel provenance"><h3>Run provenance</h3><div id="provenance"></div></div>
+      <div class="finish"><div><b>Analysis workspace ready.</b><p>The next product layer is model training, evaluation, explainability and the bounded agentic recommendation layer.</p></div><button class="secondary" onclick="location.reload()">Start another dataset</button></div>
+    </section>
+  </main>
+</div>
 <script src="/static/app.js"></script>
 </body>
 </html>
-
