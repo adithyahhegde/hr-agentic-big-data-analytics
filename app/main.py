@@ -18,6 +18,7 @@ from app.services.insight_agent import synthesize
 from app.services.ml_engine import run_anomaly_detection, run_clustering, run_ml
 from app.services.profiling import canonical_fields, profile_dataset
 from app.services.run_history import history
+from app.services.spark_ml_engine import run_spark_clustering, run_spark_ml
 from app.services.task_detection import detect_tasks
 from app.services.workload_router import RoutingPolicy, WorkloadProfile, route_workload
 
@@ -130,8 +131,15 @@ def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
     key = (dataset_id, objective)
     if key in ml_runs: return ml_runs[key]
     try:
-        result = run_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields)); result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version}); ml_runs[key] = result
-        history.record(dataset_id, dataset.sha256, objective, "SUCCEEDED", result, "LOCAL")
+        workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
+        engine = route_workload(workload)
+        if engine.value == "SPARK":
+            result = run_spark_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields))
+        else:
+            result = run_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields))
+        result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, "engine": engine.value})
+        ml_runs[key] = result
+        history.record(dataset_id, dataset.sha256, objective, "SUCCEEDED", result, engine.value)
         return result
     except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
     except RuntimeError as error: raise HTTPException(status_code=503, detail=str(error)) from error
@@ -146,8 +154,15 @@ def run_dataset_unsupervised(dataset_id: str, objective: str) -> dict[str, objec
     key = (dataset_id, objective)
     if key in ml_runs: return ml_runs[key]
     try:
-        result = (run_clustering if objective == "employee_clustering" else run_anomaly_detection)(dataset.path, mappings, list(task.feature_fields)); result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version}); ml_runs[key] = result
-        history.record(dataset_id, dataset.sha256, objective, "SUCCEEDED", result, "LOCAL")
+        workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
+        engine = route_workload(workload)
+        if engine.value == "SPARK" and objective == "employee_clustering":
+            result = run_spark_clustering(dataset.path, mappings, list(task.feature_fields))
+        else:
+            result = (run_clustering if objective == "employee_clustering" else run_anomaly_detection)(dataset.path, mappings, list(task.feature_fields))
+        result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, "engine": engine.value})
+        ml_runs[key] = result
+        history.record(dataset_id, dataset.sha256, objective, "SUCCEEDED", result, engine.value)
         return result
     except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
     except RuntimeError as error: raise HTTPException(status_code=503, detail=str(error)) from error
