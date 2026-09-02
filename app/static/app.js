@@ -1,175 +1,24 @@
-const form = document.querySelector('#upload-form');
-const status = document.querySelector('#status');
-const canonicalFields = ['unknown', 'employee_id', 'department', 'job_role', 'age', 'tenure_years', 'salary', 'performance_rating', 'attrition', 'overtime'];
-let latestProfile;
+let latestProfile=null;let schemaFields=['unknown'];let accepted=null;let analytics=null;let tasks=null;const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
 
-function optionLabel(field) { return field === 'unknown' ? 'Unknown / do not map' : field.replaceAll('_', ' '); }
+async function json(url,options={}){const r=await fetch(url,options);const data=await r.json();if(!r.ok)throw new Error(data.detail||'Request failed');return data}
+function metric(label,value,sub=''){return `<div class="metric-card"><div class="metric-value">${value}</div><div class="metric-label">${label}</div>${sub?`<div class="metric-subtext">${sub}</div>`:''}</div>`}
+function go(step){$$('.step-panel').forEach(x=>x.hidden=x.id!==`step-${step}`);$$('.nav-step').forEach(x=>x.classList.toggle('active',x.dataset.step===String(step)));$$('.nav-step').forEach(x=>x.classList.toggle('done',Number(x.dataset.step)<step));window.scrollTo({top:0,behavior:'smooth'})}
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 
-function createMetricCard(label, value, subtext = '') {
-  const card = document.createElement('div');
-  card.className = 'metric-card';
-  const valElem = document.createElement('div');
-  valElem.className = 'metric-value';
-  valElem.textContent = value;
-  const lblElem = document.createElement('div');
-  lblElem.className = 'metric-label';
-  lblElem.textContent = label;
-  card.append(valElem, lblElem);
-  if (subtext) {
-    const subElem = document.createElement('div');
-    subElem.className = 'metric-subtext';
-    subElem.textContent = subtext;
-    card.append(subElem);
-  }
-  return card;
-}
+$('#dataset').addEventListener('change',e=>{$('#file-name').textContent=e.target.files[0]?.name||'No file selected'});
+$$('.nav-step').forEach(b=>b.addEventListener('click',()=>{const n=Number(b.dataset.step);if(n===1||latestProfile)go(n)}));
+$$('[data-back]').forEach(b=>b.addEventListener('click',()=>go(Number(b.dataset.back))));
+$$('[data-next]').forEach(b=>b.addEventListener('click',()=>go(Number(b.dataset.next))));
 
-function renderProfile(data) {
-  const summary = document.querySelector('#summary');
-  summary.replaceChildren(
-    createMetricCard('Total Rows', data.row_count.toLocaleString()),
-    createMetricCard('Columns', data.column_count.toLocaleString()),
-    createMetricCard('Duplicate Rows', data.duplicate_row_count.toLocaleString(), `${((data.duplicate_row_count / (data.row_count || 1)) * 100).toFixed(1)}% of rows`)
-  );
+(async()=>{try{schemaFields=(await json('/api/schema/fields')).fields;$('#connection').innerHTML='<i></i> System ready'}catch(e){$('#connection').textContent='System unavailable'}})();
 
-  if (data.data_quality) {
-    const dq = data.data_quality;
-    const dqMetrics = document.querySelector('#dq-metrics');
-    dqMetrics.replaceChildren(
-      createMetricCard('Health Score', `${dq.health_score} / 100`, dq.health_score >= 80 ? 'Good quality' : dq.health_score >= 50 ? 'Moderate quality' : 'Requires attention'),
-      createMetricCard('Completeness', `${(dq.metrics.completeness_rate * 100).toFixed(1)}%`, `${dq.metrics.missing_cells.toLocaleString()} missing cells`),
-      createMetricCard('Clean Rows', `${(dq.metrics.clean_row_rate * 100).toFixed(1)}%`, `${dq.metrics.clean_row_count.toLocaleString()} fully populated`),
-      createMetricCard('Constant Columns', String(dq.metrics.constant_column_count), dq.metrics.constant_column_count > 0 ? 'Zero/near-zero variance' : 'No degenerate columns')
-    );
+$('#upload-form').addEventListener('submit',async e=>{e.preventDefault();const button=$('#analyze-upload');button.disabled=true;$('#status').textContent='Reading, profiling and assessing the dataset…';try{latestProfile=await json('/api/datasets/profile',{method:'POST',body:new FormData(e.target)});renderHealth(latestProfile);renderMappings(latestProfile);go(2);$('#status').textContent=''}catch(err){$('#status').textContent=err.message}finally{button.disabled=false}});
 
-    document.querySelector('#dq-rule-count').textContent = String(dq.rules.length);
-    const rulesBody = document.querySelector('#dq-rules-rows');
-    rulesBody.replaceChildren();
-    dq.rules.forEach((rule) => {
-      const row = document.createElement('tr');
-      const nameCell = document.createElement('td');
-      nameCell.textContent = rule.rule_name.replaceAll('_', ' ');
-      const catCell = document.createElement('td');
-      catCell.textContent = rule.category;
-      const statusCell = document.createElement('td');
-      statusCell.textContent = `${rule.status} (${rule.severity})`;
-      statusCell.className = `rule-status-${rule.status.toLowerCase()}`;
-      const msgCell = document.createElement('td');
-      msgCell.textContent = rule.message;
-      row.append(nameCell, catCell, statusCell, msgCell);
-      rulesBody.append(row);
-    });
-  }
+function renderHealth(d){const q=d.data_quality;$('#summary').innerHTML=[metric('Rows',d.row_count.toLocaleString()),metric('Columns',d.column_count.toLocaleString()),metric('Duplicate rows',d.duplicate_row_count.toLocaleString()),metric('Schema version',d.schema_version||'—')].join('');if(!q)return;const health=q.health_score;$('#quality-label').textContent=health>=80?'GOOD':health>=50?'MODERATE':'ATTENTION REQUIRED';$('#dq-metrics').innerHTML=[metric('Health score',`${health} / 100`),metric('Completeness',`${(q.metrics.completeness_rate*100).toFixed(1)}%`),metric('Clean rows',`${(q.metrics.clean_row_rate*100).toFixed(1)}%`),metric('Constant columns',q.metrics.constant_column_count)].join('');$('#dq-rule-rows').innerHTML=q.rules.map(r=>`<tr><td>${esc(r.rule_name.replaceAll('_',' '))}</td><td>${esc(r.category)}</td><td>${esc(r.status)} · ${esc(r.severity)}</td><td>${esc(r.message)}</td></tr>`).join('')}
+function renderMappings(d){const candidates=Object.values(d.mappings);const auto=candidates.filter(x=>x.decision==='AUTO_MAPPED').length,review=candidates.filter(x=>x.decision==='NEEDS_REVIEW').length,unknown=candidates.filter(x=>x.decision==='UNMAPPED').length;$('#mapping-summary').textContent=`${auto} automatic · ${review} need review · ${unknown} unknown. Confirm only mappings you trust.`;$('#mapping-rows').innerHTML=d.columns.map(c=>{const x=d.mappings[c.source_name];const opts=schemaFields.map(f=>`<option value="${esc(f)}" ${f===x.canonical_field?'selected':''}>${esc(f.replaceAll('_',' '))}</option>`).join('');const conf=Math.round(x.confidence*100);return `<tr><td><b>${esc(c.source_name)}</b></td><td>${esc(c.inferred_type)}</td><td>${(c.missing_percentage*100).toFixed(1)}%</td><td><select data-source="${esc(c.source_name)}">${opts}</select></td><td class="confidence">${conf}%</td><td class="evidence">${esc(x.decision)} · ${esc(x.evidence.join(', '))}</td></tr>`}).join('')}
 
-  const candidates = Object.values(data.mappings);
-  const automatic = candidates.filter((candidate) => candidate.decision === 'AUTO_MAPPED').length;
-  const unclear = candidates.filter((candidate) => candidate.decision === 'UNMAPPED').length;
-  const conflicts = candidates.filter((candidate) => candidate.decision === 'NEEDS_REVIEW').length;
-  document.querySelector('#mapping-summary').textContent = `${automatic} fields mapped automatically · ${unclear} left unknown · ${conflicts} conflict${conflicts === 1 ? '' : 's'}`;
+$('#confirm-schema').addEventListener('click',async()=>{if(!latestProfile)return;const mappings=Object.fromEntries($$('#mapping-rows select').map(s=>[s.dataset.source,s.value]));$('#schema-status').textContent='Confirming schema and detecting feasible analyses…';try{accepted=await json(`/api/datasets/${latestProfile.dataset_id}/schema`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mappings})});tasks=await json(`/api/datasets/${latestProfile.dataset_id}/tasks`);analytics=await json(`/api/datasets/${latestProfile.dataset_id}/analytics`);renderTasks();renderAnalytics();renderInsights();go(4);$('#schema-status').textContent=''}catch(err){$('#schema-status').textContent=err.message}});
 
-  const body = document.querySelector('#rows');
-  body.replaceChildren();
-  data.columns.forEach((column) => {
-    const candidate = data.mappings[column.source_name];
-    const row = document.createElement('tr');
-
-    let statSummary = column.sample_values.slice(0, 3).join(', ');
-    if (column.numeric_stats) {
-      statSummary = `min: ${column.numeric_stats.min}, max: ${column.numeric_stats.max}, mean: ${column.numeric_stats.mean}`;
-    }
-
-    const missingStr = `${(column.missing_percentage * 100).toFixed(1)}% (${column.null_count})`;
-
-    [column.source_name, column.inferred_type, missingStr, statSummary].forEach((value) => {
-      const cell = document.createElement('td');
-      cell.textContent = value;
-      row.append(cell);
-    });
-
-    const mappingCell = document.createElement('td');
-    const select = document.createElement('select');
-    select.dataset.source = column.source_name;
-    select.setAttribute('aria-label', `Mapping for ${column.source_name}`);
-    canonicalFields.forEach((field) => {
-      const option = document.createElement('option');
-      option.value = field;
-      option.textContent = optionLabel(field);
-      option.selected = field === candidate.canonical_field;
-      select.append(option);
-    });
-    mappingCell.append(select);
-    row.append(mappingCell);
-
-    const evidenceCell = document.createElement('td');
-    evidenceCell.textContent = `${candidate.decision}: ${candidate.evidence.join(', ')}`;
-    row.append(evidenceCell);
-    body.append(row);
-  });
-
-  const issues = document.querySelector('#issues');
-  issues.replaceChildren();
-  (data.issues.length ? data.issues : [{severity: 'INFO', message: 'No profile warnings.'}]).forEach((issue) => {
-    const item = document.createElement('li');
-    item.textContent = `${issue.severity}: ${issue.message}`;
-    issues.append(item);
-  });
-}
-
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  status.textContent = 'Validating and profiling the selected file…';
-  const response = await fetch('/api/datasets/profile', { method: 'POST', body: new FormData(form) });
-  const result = document.querySelector('#result');
-  if (!response.ok) {
-    const body = await response.json();
-    status.textContent = body.detail || 'The file could not be processed.';
-    result.hidden = true;
-    return;
-  }
-  latestProfile = await response.json();
-  status.textContent = 'Profile completed. You can continue with safe mappings or review them.';
-  result.hidden = false;
-  document.querySelector('#capabilities').hidden = true;
-  document.querySelector('#mapping-review').open = false;
-  renderProfile(latestProfile);
-});
-
-async function submitMappings(mappings) {
-  if (!latestProfile) return;
-  const schemaStatus = document.querySelector('#schema-status');
-  schemaStatus.textContent = 'Checking confirmed mappings…';
-  const response = await fetch(`/api/datasets/${latestProfile.dataset_id}/schema`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({mappings})
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    schemaStatus.textContent = data.detail || 'The mappings need review.';
-    return;
-  }
-  schemaStatus.textContent = 'Mappings confirmed for this temporary session.';
-  document.querySelector('#capabilities').hidden = false;
-  const list = document.querySelector('#capability-list');
-  list.replaceChildren();
-  data.capabilities.forEach((capability) => {
-    const item = document.createElement('li');
-    item.textContent = `${capability.objective}: ${capability.status} — ${capability.reasons.join(' ')}`;
-    list.append(item);
-  });
-}
-
-document.querySelector('#continue-mappings').addEventListener('click', () => {
-  if (!latestProfile) return;
-  submitMappings(Object.fromEntries(Object.entries(latestProfile.mappings).map(([source, candidate]) => [source, candidate.canonical_field])));
-});
-
-document.querySelector('#review-mappings').addEventListener('click', () => {
-  document.querySelector('#mapping-review').open = true;
-  document.querySelector('#mapping-review').scrollIntoView({behavior: 'smooth'});
-});
-
-document.querySelector('#accept-mappings').addEventListener('click', () => {
-  submitMappings(Object.fromEntries([...document.querySelectorAll('#rows select')].map((select) => [select.dataset.source, select.value])));
-});
-
+function renderTasks(){const names={attrition_classification:'Attrition classification',salary_regression:'Salary regression',employee_clustering:'Employee clustering',anomaly_detection:'Anomaly detection'};$('#task-grid').innerHTML=tasks.tasks.map(t=>{const ready=t.status==='FEASIBLE';return `<article class="task-card ${ready?'ready':'blocked'}"><div class="task-state">${ready?'FEASIBLE':'BLOCKED'}</div><h3>${esc(names[t.objective]||t.objective)}</h3><p>${esc(t.reasons.join(' '))}</p>${t.feature_fields?.length?`<div class="features">Features: ${esc(t.feature_fields.join(', '))}</div>`:''}</article>`}).join('')}
+function renderAnalytics(){const a=analytics;$('#engine-badge').textContent=`${a.engine} execution`;$('#analysis-metrics').innerHTML=[metric('Rows analysed',a.row_count.toLocaleString()),metric('Duplicate rows',a.duplicate_row_count.toLocaleString()),metric('Numeric fields',a.numeric_summary.length),metric('Categorical fields',a.categorical_summary.length)].join('');$('#numeric-rows').innerHTML=a.numeric_summary.map(x=>`<tr><td><b>${esc(x.field)}</b></td><td>${Number(x.count).toLocaleString()}</td><td>${esc(x.min)}</td><td>${esc(x.mean)}</td><td>${esc(x.max)}</td></tr>`).join('')||'<tr><td colspan="5">No mapped numeric fields available.</td></tr>';$('#categorical-rows').innerHTML=a.categorical_summary.map(x=>`<tr><td><b>${esc(x.field)}</b></td><td>${esc(x.distinct)}</td><td>${x.top_values.map(v=>`${esc(v.value)} (${(Number(v.share)*100).toFixed(1)}%)`).join(' · ')}</td></tr>`).join('')||'<tr><td colspan="3">No mapped categorical fields available.</td></tr>'}
+function renderInsights(){const items=analytics.insights;$('#insight-list').innerHTML=(items.length?items:[{type:'SYSTEM',severity:'INFO',title:'No material findings generated yet',evidence:'The deterministic analytics layer found no rule-based insight meeting its current evidence thresholds.'}]).map(i=>`<article class="insight"><div class="kind">${esc(i.type)} · ${esc(i.severity)}</div><h3>${esc(i.title)}</h3><p>${esc(i.evidence)}</p></article>`).join('');$('#provenance').innerHTML=[['Dataset ID',analytics.dataset_id],['Execution engine',analytics.engine],['Rows analysed',analytics.row_count.toLocaleString()],['Schema status','User-confirmed']].map(r=>`<div class="prov-row"><span>${esc(r[0])}</span><b>${esc(r[1])}</b></div>`).join('')}
