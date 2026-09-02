@@ -15,7 +15,7 @@ from app.services.capabilities import determine_capabilities
 from app.services.csv_ingestion import CsvValidationError, parse_csv
 from app.services.dataset_store import store
 from app.services.insight_agent import synthesize
-from app.services.ml_engine import run_ml
+from app.services.ml_engine import run_anomaly_detection, run_clustering, run_ml
 from app.services.profiling import canonical_fields, profile_dataset
 from app.services.task_detection import detect_tasks
 from app.services.workload_router import RoutingPolicy, WorkloadProfile, route_workload
@@ -136,6 +136,31 @@ def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
         return ml_runs[key]
     try:
         result = run_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields))
+        result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version})
+        ml_runs[key] = result
+        return result
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+@app.post("/api/datasets/{dataset_id}/ml/{objective}/unsupervised")
+def run_dataset_unsupervised(dataset_id: str, objective: str) -> dict[str, object]:
+    profile = profiles.get(dataset_id)
+    mappings = accepted_mappings.get(dataset_id)
+    dataset = store.get(dataset_id)
+    if profile is None or mappings is None or dataset is None:
+        raise HTTPException(status_code=409, detail="Confirm the dataset schema before running ML.")
+    task = next((task for task in detect_tasks(mappings, profile.row_count) if task.objective == objective), None)
+    if task is None or objective not in {"employee_clustering", "anomaly_detection"}:
+        raise HTTPException(status_code: 404, detail="Unknown unsupervised analytical objective.")
+    if task.status != "FEASIBLE":
+        raise HTTPException(status_code=409, detail="This analytical task is currently blocked by the confirmed schema or dataset size.")
+    key = (dataset_id, objective)
+    if key in ml_runs:
+        return ml_runs[key]
+    try:
+        result = (run_clustering if objective == "employee_clustering" else run_anomaly_detection)(dataset.path, mappings, list(task.feature_fields))
         result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version})
         ml_runs[key] = result
         return result
