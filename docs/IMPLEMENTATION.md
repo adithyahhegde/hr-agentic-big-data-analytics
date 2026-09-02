@@ -5,7 +5,6 @@
 - [x] Freeze MVP requirements in `MVP_SPEC.md`.
 - [x] Define agent and API/tool contracts in `AGENT_ENGINE.md` and `API_CONTRACTS.md`.
 
-
 ## Phase 1 — Repository foundation
 - [x] Backend skeleton.
 - [x] Frontend skeleton.
@@ -19,11 +18,11 @@
 - [x] Data-quality report.
 
 ## Phase 3 — Semantic schema layer
-- [ ] Canonical HR schema.
+- [x] Canonical HR schema.
 - [x] Deterministic mappings.
 - [x] Confidence scoring.
 - [x] Collision/ambiguity blocking at schema acceptance.
-- [ ] Optional local LLM fallback.
+- [x] Optional local LLM fallback.
 
 ## Phase 4 — Big Data engine
 - [ ] Spark integration.
@@ -73,6 +72,7 @@
 ## Definition of done
 A phase is complete only when implementation, tests, documentation, and known limitations agree. The agent must update the relevant docs in the same change set.
 
-## Foundation release (0.1.0)
+## Current status
+M0 Foundation, M1 Data Quality, M2 Canonical HR Schema, and M3 optional local LLM fallback are implemented. M3 is disabled by default, invokes Ollama only for ambiguous deterministic mappings with candidate alternatives, validates the returned field against that candidate set, and falls back safely when the provider is unavailable or malformed.
 
-Implemented `GET /api/health`, `POST /api/datasets/profile`, and temporary-session `POST /api/datasets/{dataset_id}/schema`; these provide deterministic alias/value-pattern mapping, collision review gates, preliminary feasibility, and a minimal intake UI. Spark, durable persistence, local LLM, agent execution, and ML are deliberately not implemented. See `MVP_SPEC.md` and `API_CONTRACTS.md`.
+Next target: Phase 4 Big Data engine. Begin with workload routing and an engine-neutral execution interface; add Spark only where workload characteristics justify distributed execution.
