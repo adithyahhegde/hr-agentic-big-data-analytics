@@ -132,3 +132,14 @@ class WorkloadRoutingResponse(BaseModel):
     file_count: int
     requires_distributed: bool
     policy: dict[str, int]
+
+
+class DatasetExecutionResponse(BaseModel):
+    dataset_id: str
+    status: str
+    engine: str
+    row_count: int
+    column_count: int
+    size_bytes: int
+    dataset_fingerprint: str
+    warnings: list[str] = Field(default_factory=list)
