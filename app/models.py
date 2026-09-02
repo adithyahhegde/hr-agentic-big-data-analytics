@@ -50,9 +50,7 @@ class MappingCandidate(BaseModel):
     confidence: float = Field(ge=0, le=1)
     decision: str
     evidence: list[str]
-    # Alternative candidate canonical fields (populated when decision is NEEDS_REVIEW)
     alternatives: list[str] = Field(default_factory=list)
-    # Component evidence scores for transparency (each in [0, 1])
     name_score: float = 0.0
     type_score: float = 0.0
     value_score: float = 0.0
@@ -98,7 +96,6 @@ class DatasetProfile(BaseModel):
     issues: list[Issue]
     data_quality: DataQualityReport | None = None
     llm_used: bool = False
-    # Schema versioning and reproducibility (SCHEMA_ENGINE.md §12)
     schema_version: str = ""
     dataset_fingerprint: str = ""
 
@@ -118,3 +115,20 @@ class SchemaAcceptanceResponse(BaseModel):
     mappings: dict[str, str]
     capabilities: list[Capability]
 
+
+class WorkloadRoutingRequest(BaseModel):
+    row_count: int = Field(ge=0)
+    column_count: int = Field(ge=0)
+    estimated_bytes: int | None = Field(default=None, ge=0)
+    file_count: int = Field(default=1, ge=1)
+    requires_distributed: bool = False
+
+
+class WorkloadRoutingResponse(BaseModel):
+    engine: str
+    row_count: int
+    column_count: int
+    estimated_bytes: int | None = None
+    file_count: int
+    requires_distributed: bool
+    policy: dict[str, int]
