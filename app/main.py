@@ -4,7 +4,7 @@ from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
@@ -17,6 +17,7 @@ from app.services.dataset_store import store
 from app.services.insight_agent import synthesize
 from app.services.ml_engine import run_anomaly_detection, run_clustering, run_ml
 from app.services.profiling import canonical_fields, profile_dataset
+from app.services.report_export import build_report, to_html
 from app.services.run_history import history
 from app.services.spark_ml_engine import run_spark_clustering, run_spark_ml
 from app.services.task_detection import detect_tasks
@@ -103,8 +104,7 @@ def accept_schema(dataset_id: str, request: SchemaAcceptanceRequest) -> SchemaAc
 
 @app.get("/api/datasets/{dataset_id}/tasks", response_model=TaskDetectionResponse)
 def detect_dataset_tasks(dataset_id: str) -> TaskDetectionResponse:
-    profile = profiles.get(dataset_id)
-    mappings = accepted_mappings.get(dataset_id)
+    profile = profiles.get(dataset_id); mappings = accepted_mappings.get(dataset_id)
     if profile is None or mappings is None:
         raise HTTPException(status_code=409, detail="Confirm the dataset schema before detecting analytical tasks.")
     tasks = detect_tasks(mappings, profile.row_count)
@@ -131,14 +131,9 @@ def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
     key = (dataset_id, objective)
     if key in ml_runs: return ml_runs[key]
     try:
-        workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
-        engine = route_workload(workload)
-        if engine.value == "SPARK":
-            result = run_spark_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields))
-        else:
-            result = run_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields))
-        result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, "engine": engine.value})
-        ml_runs[key] = result
+        workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes); engine = route_workload(workload)
+        result = run_spark_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields)) if engine.value == "SPARK" else run_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields))
+        result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, "engine": engine.value}); ml_runs[key] = result
         history.record(dataset_id, dataset.sha256, objective, "SUCCEEDED", result, engine.value)
         return result
     except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
@@ -154,14 +149,12 @@ def run_dataset_unsupervised(dataset_id: str, objective: str) -> dict[str, objec
     key = (dataset_id, objective)
     if key in ml_runs: return ml_runs[key]
     try:
-        workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
-        engine = route_workload(workload)
+        workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes); engine = route_workload(workload)
         if engine.value == "SPARK" and objective == "employee_clustering":
             result = run_spark_clustering(dataset.path, mappings, list(task.feature_fields))
         else:
             result = (run_clustering if objective == "employee_clustering" else run_anomaly_detection)(dataset.path, mappings, list(task.feature_fields))
-        result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, "engine": engine.value})
-        ml_runs[key] = result
+        result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, "engine": engine.value}); ml_runs[key] = result
         history.record(dataset_id, dataset.sha256, objective, "SUCCEEDED", result, engine.value)
         return result
     except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
@@ -171,16 +164,30 @@ def run_dataset_unsupervised(dataset_id: str, objective: str) -> dict[str, objec
 def dataset_runs(dataset_id: str, limit: int = 50) -> dict[str, object]:
     return {"dataset_id": dataset_id, "runs": history.list(dataset_id, limit)}
 
+
+def _report(dataset_id: str) -> dict[str, object]:
+    profile = profiles.get(dataset_id); mappings = accepted_mappings.get(dataset_id); dataset = store.get(dataset_id)
+    if profile is None or mappings is None or dataset is None:
+        raise HTTPException(status_code=409, detail="Confirm the dataset schema before exporting a report.")
+    workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
+    engine = route_workload(workload)
+    analytics = {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analyze_csv(dataset.path, mappings)}
+    runs = [result for (stored_dataset, _), result in ml_runs.items() if stored_dataset == dataset_id]
+    insights = synthesize(analytics, runs)
+    return build_report(dataset_id, dataset.sha256, profile.schema_version, analytics, runs, insights)
+
+@app.get("/api/datasets/{dataset_id}/report.json")
+def dataset_report_json(dataset_id: str) -> JSONResponse:
+    return JSONResponse(_report(dataset_id))
+
+@app.get("/api/datasets/{dataset_id}/report.html", response_class=HTMLResponse)
+def dataset_report_html(dataset_id: str) -> HTMLResponse:
+    return HTMLResponse(to_html(_report(dataset_id)))
+
 @app.get("/api/datasets/{dataset_id}/insights")
 def dataset_insights(dataset_id: str) -> dict[str, object]:
-    profile = profiles.get(dataset_id); mappings = accepted_mappings.get(dataset_id); dataset = store.get(dataset_id)
-    if profile is None or mappings is None or dataset is None: raise HTTPException(status_code=409, detail="Confirm the dataset schema before synthesizing insights.")
-    try:
-        workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes); engine = route_workload(workload)
-        analytics = {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analyze_csv(dataset.path, mappings)}
-        runs = [result for (stored_dataset, _), result in ml_runs.items() if stored_dataset == dataset_id]
-        return synthesize(analytics, runs) | {"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version}
-    except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
+    report = _report(dataset_id)
+    return report["insights"] | {"dataset_id": dataset_id, "dataset_fingerprint": report["dataset_fingerprint"], "schema_version": report["schema_version"]}
 
 @app.get("/")
 def index() -> FileResponse:
