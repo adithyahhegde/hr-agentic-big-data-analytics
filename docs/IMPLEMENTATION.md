@@ -25,10 +25,11 @@
 - [x] Optional local LLM fallback.
 
 ## Phase 4 — Big Data engine
-- [ ] Spark integration.
-- [ ] Small/large workload routing.
-- [ ] Parquet intermediate representation.
-- [ ] Scalable joins/transforms.
+- [x] Spark integration (optional runtime dependency).
+- [x] Small/large workload routing.
+- [x] Parquet intermediate representation.
+- [x] Scalable grouped transformations.
+- [ ] End-to-end API integration of workload routing and execution.
 
 ## Phase 5 — Analytics/ML engine
 - [ ] Task detection.
@@ -73,6 +74,6 @@
 A phase is complete only when implementation, tests, documentation, and known limitations agree. The agent must update the relevant docs in the same change set.
 
 ## Current status
-M0 Foundation, M1 Data Quality, M2 Canonical HR Schema, and M3 optional local LLM fallback are implemented. M3 is disabled by default, invokes Ollama only for ambiguous deterministic mappings with candidate alternatives, validates the returned field against that candidate set, and falls back safely when the provider is unavailable or malformed.
+M0 Foundation, M1 Data Quality, M2 Canonical HR Schema, M3 optional local LLM fallback, and the core M4 Big Data execution services are implemented. M4 now has deterministic workload routing, optional Spark execution, local execution, Parquet output, and distributed-safe grouped aggregation. API-level execution integration and benchmark validation remain before Phase 4 is fully closed.
 
-Next target: Phase 4 Big Data engine. Begin with workload routing and an engine-neutral execution interface; add Spark only where workload characteristics justify distributed execution.
+Next target: integrate the M4 execution services into the analytical API, then proceed to Phase 5 task detection and ML.
