@@ -14,8 +14,9 @@ from app.services.big_data_engine import read_csv
 from app.services.capabilities import determine_capabilities
 from app.services.csv_ingestion import CsvValidationError, parse_csv
 from app.services.dataset_store import store
+from app.services.heterogeneous_ml import run_heterogeneous_ml
 from app.services.insight_agent import synthesize
-from app.services.ml_engine import run_anomaly_detection, run_clustering, run_ml
+from app.services.ml_engine import run_anomaly_detection, run_clustering
 from app.services.profiling import canonical_fields, profile_dataset
 from app.services.report_export import build_report, to_html
 from app.services.run_history import history
@@ -132,7 +133,7 @@ def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
     if key in ml_runs: return ml_runs[key]
     try:
         workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes); engine = route_workload(workload)
-        result = run_spark_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields)) if engine.value == "SPARK" else run_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields))
+        result = run_spark_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields)) if engine.value == "SPARK" else run_heterogeneous_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields))
         result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, "engine": engine.value}); ml_runs[key] = result
         history.record(dataset_id, dataset.sha256, objective, "SUCCEEDED", result, engine.value)
         return result
@@ -167,8 +168,7 @@ def dataset_runs(dataset_id: str, limit: int = 50) -> dict[str, object]:
 
 def _report(dataset_id: str) -> dict[str, object]:
     profile = profiles.get(dataset_id); mappings = accepted_mappings.get(dataset_id); dataset = store.get(dataset_id)
-    if profile is None or mappings is None or dataset is None:
-        raise HTTPException(status_code=409, detail="Confirm the dataset schema before exporting a report.")
+    if profile is None or mappings is None or dataset is None: raise HTTPException(status_code=409, detail="Confirm the dataset schema before exporting a report.")
     workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
     engine = route_workload(workload)
     analytics = {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analyze_csv(dataset.path, mappings)}
