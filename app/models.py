@@ -143,3 +143,17 @@ class DatasetExecutionResponse(BaseModel):
     size_bytes: int
     dataset_fingerprint: str
     warnings: list[str] = Field(default_factory=list)
+
+
+class TaskCandidateResponse(BaseModel):
+    objective: str
+    status: str
+    target_field: str | None = None
+    feature_fields: list[str] = Field(default_factory=list)
+    reasons: list[str] = Field(default_factory=list)
+
+
+class TaskDetectionResponse(BaseModel):
+    dataset_id: str
+    row_count: int
+    tasks: list[TaskCandidateResponse]
