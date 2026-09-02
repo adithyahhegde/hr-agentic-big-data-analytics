@@ -57,7 +57,7 @@
       <div class="panel"><div class="panel-head"><h3>Deterministic descriptive analytics</h3><span id="engine-badge" class="engine-badge"></span></div><div id="analysis-metrics" class="metric-grid compact"></div></div>
       <div class="panel"><h3>Numeric fields</h3><table><thead><tr><th>Field</th><th>Count</th><th>Minimum</th><th>Mean</th><th>Maximum</th></tr></thead><tbody id="numeric-rows"></tbody></table></div>
       <div class="panel"><h3>Categorical fields</h3><table><thead><tr><th>Field</th><th>Distinct</th><th>Most common values</th></tr></thead><tbody id="categorical-rows"></tbody></table></div>
-      <div class="panel"><div class="panel-head"><h3>Predictive modelling</h3><span class="engine-badge">Local / reproducible</span></div><p class="panel-copy">For each feasible supervised task, the engine compares multiple candidates on a held-out test set and selects the best candidate using a task-appropriate metric. Clustering and anomaly models are the next extension point.</p><div id="ml-actions" class="ml-actions"></div><div id="ml-status" class="status"></div></div>
+      <div class="panel"><div class="panel-head"><h3>Predictive modelling</h3><span id="ml-engine-badge" class="engine-badge">Auto-routed</span></div><p class="panel-copy">The workbench compares multiple candidates on a held-out test set. Small workloads stay local; workloads that exceed routing thresholds use distributed Spark ML where supported.</p><div id="ml-actions" class="ml-actions"></div><div id="ml-status" class="status"></div></div>
       <div class="step-actions"><button class="primary" data-next="5">View evidence & insights</button></div>
     </section>
 
@@ -66,8 +66,8 @@
       <div id="insight-list" class="insight-list"></div>
       <div class="panel"><h3>Model evaluation</h3><div id="ml-results"></div></div>
       <div class="panel"><div class="panel-head"><h3>Bounded agentic synthesis</h3><span class="engine-badge">Evidence only</span></div><p class="panel-copy">The synthesis layer consumes structured findings, ranks evidence, and proposes reversible investigation/remediation actions. It does not access unrestricted HR records or make employment decisions.</p><div id="agent-insights"></div></div>
-      <div class="panel provenance"><h3>Run provenance</h3><div id="provenance"></div></div>
-      <div class="finish"><div><b>Analysis workspace ready.</b><p>The next extensions are native scalable ML, richer categorical modelling, SHAP explanations, durable persistence and formal robustness evaluation.</p></div><button class="secondary" onclick="location.reload()">Start another dataset</button></div>
+      <div class="panel provenance"><div class="panel-head"><h3>Run provenance</h3><span class="engine-badge">Reproducible report</span></div><div id="provenance"></div><div class="export-actions"><a id="json-report" class="secondary" target="_blank" rel="noopener">Open JSON report</a><a id="html-report" class="secondary" target="_blank" rel="noopener">Open HTML report</a></div></div>
+      <div class="finish"><div><b>Analysis workspace ready.</b><p>The workbench now supports local and routed distributed ML, aggregate unsupervised analysis, persistent run history and reproducible report exports.</p></div><button class="secondary" onclick="location.reload()">Start another dataset</button></div>
     </section>
   </main>
 </div>
