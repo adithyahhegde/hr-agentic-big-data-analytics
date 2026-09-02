@@ -1,8 +1,7 @@
 """Process-local dataset storage for the M4 execution boundary.
 
-The store keeps uploaded CSVs on local disk rather than in memory. It is
-intentionally process-local for the MVP; durable persistence belongs to the
-persistence phase.
+Uploaded CSVs are streamed to local disk rather than retained in application
+memory. Durable persistence belongs to the later persistence phase.
 """
 from __future__ import annotations
 
@@ -11,6 +10,7 @@ import hashlib
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import BinaryIO
 
 
 @dataclass(frozen=True)
@@ -29,38 +29,42 @@ class DatasetStore:
         self._root = Path(tempfile.mkdtemp(prefix="hr_analytics_"))
         self._datasets: dict[str, StoredDataset] = {}
 
-    def save_csv(self, dataset_id: str, filename: str, payload: bytes) -> StoredDataset:
-        if not payload:
-            raise ValueError("The uploaded dataset is empty.")
+    def save_upload(self, dataset_id: str, filename: str, stream: BinaryIO, max_bytes: int) -> StoredDataset:
         path = self._root / f"{dataset_id}.csv"
-        path.write_bytes(payload)
-        return self._register(dataset_id, path, filename)
-
-    def _register(self, dataset_id: str, path: Path, filename: str) -> StoredDataset:
-        sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        total = 0
+        digest = hashlib.sha256()
+        with path.open("wb") as output:
+            while True:
+                chunk = stream.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    path.unlink(missing_ok=True)
+                    raise ValueError("The uploaded file exceeds the configured execution size limit.")
+                digest.update(chunk)
+                output.write(chunk)
+        if total == 0:
+            path.unlink(missing_ok=True)
+            raise ValueError("The uploaded dataset is empty.")
         row_count, column_count = self._count_csv(path)
-        dataset = StoredDataset(
-            dataset_id=dataset_id,
-            path=path,
-            filename=filename,
-            size_bytes=path.stat().st_size,
-            row_count=row_count,
-            column_count=column_count,
-            sha256=sha256,
-        )
+        dataset = StoredDataset(dataset_id, path, filename, total, row_count, column_count, digest.hexdigest())
         self._datasets[dataset_id] = dataset
         return dataset
 
     @staticmethod
     def _count_csv(path: Path) -> tuple[int, int]:
-        with path.open("r", encoding="utf-8-sig", newline="") as handle:
-            reader = csv.reader(handle)
-            try:
-                headers = next(reader)
-            except StopIteration as exc:
-                raise ValueError("The uploaded dataset has no header row.") from exc
-            rows = sum(1 for _ in reader)
-        return rows, len(headers)
+        try:
+            with path.open("r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.reader(handle)
+                headers = next(reader, None)
+                if not headers:
+                    raise ValueError("The uploaded dataset must include a header row.")
+                return sum(1 for _ in reader), len(headers)
+        except UnicodeDecodeError as exc:
+            raise ValueError("The CSV must be UTF-8 encoded.") from exc
+        except csv.Error as exc:
+            raise ValueError("The CSV could not be parsed. Check delimiters and quoting.") from exc
 
     def get(self, dataset_id: str) -> StoredDataset | None:
         return self._datasets.get(dataset_id)
