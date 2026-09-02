@@ -13,9 +13,15 @@
 
 Response `200` exposes service health and whether the optional local LLM fallback is enabled.
 
+## Schema vocabulary
+
+`GET /api/schema/fields`
+
+Returns the canonical HR field vocabulary used by the schema-review UI. The frontend does not hard-code the ontology.
+
 ## Profile a CSV
 
-`POST /api/datasets/profile` uses multipart form data with exactly one `file` field. The endpoint is intentionally bounded for profiling and does not persist the source file.
+`POST /api/datasets/profile` uses multipart form data with exactly one `file` field. The endpoint stores the upload temporarily on process-local disk so the confirmed schema can be reused by downstream analysis. Durable persistence is not implemented yet.
 
 ## Workload routing
 
@@ -31,16 +37,28 @@ Response `200` exposes service health and whether the optional local LLM fallbac
 
 ## Detect analytical tasks
 
-`GET /api/datasets/{dataset_id}/tasks` runs deterministic task detection **after schema confirmation**. It returns candidate objectives, status, target field where applicable, selected feature fields, and human-readable reasons.
+`GET /api/datasets/{dataset_id}/tasks` runs deterministic task detection after schema confirmation. It returns candidate objectives, status, target field where applicable, selected feature fields, and human-readable reasons.
 
-The detector currently evaluates four objective families:
+The detector currently evaluates four objective families: attrition classification, salary regression, employee clustering, and anomaly detection. Only the first two currently have supervised model execution.
 
-- `attrition_classification` — requires a confirmed attrition field, usable numeric HR features, and sufficient rows.
-- `salary_regression` — requires a confirmed salary field, usable numeric predictors, and sufficient rows.
-- `employee_clustering` — requires at least two supported numeric HR features and sufficient rows.
-- `anomaly_detection` — requires at least two supported numeric HR features and sufficient rows.
+## Descriptive analytics
 
-The detector does not invent targets and does not train a model. A `BLOCKED` result is an explicit valid outcome rather than an error.
+`GET /api/datasets/{dataset_id}/analytics` runs deterministic summaries over the confirmed mapping and returns numeric/categorical summaries, missingness findings, duplicate evidence, execution engine, dataset fingerprint, and schema version.
+
+## Supervised model execution
+
+`POST /api/datasets/{dataset_id}/ml/{objective}` is available only for a detected `FEASIBLE` supervised objective. The service trains bounded local candidates and returns the held-out evaluation metrics, selected model, feature evidence, safeguards, dataset fingerprint, and schema version.
+
+Current objectives and comparison sets:
+
+- `attrition_classification`: logistic regression, random forest, histogram gradient boosting; selection metric is F1.
+- `salary_regression`: ridge regression, random forest, histogram gradient boosting; selection metric is RMSE (lower is better).
+
+The engine excludes identifier-like/constant predictors, uses a reproducible holdout seed, requires at least 20 complete rows, and rejects single-class classification data. The current implementation is numeric-feature-only and is not yet the native Spark ML path.
+
+## Bounded insight synthesis
+
+`GET /api/datasets/{dataset_id}/insights` consumes only verified descriptive analytics and completed ML results. It returns an explicit synthesis plan, evidence list, reversible recommendations, limitations, and a flag showing that unrestricted raw HR records were not accessed by the synthesis layer. Recommendations are decision-support drafts, not automated employment decisions.
 
 ## Future tool envelope
 
