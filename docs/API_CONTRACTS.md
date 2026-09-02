@@ -27,6 +27,26 @@ Response `200` contains `row_count`, `column_count`, `duplicate_row_count`, `col
 
 No source file, samples, or mapping is persisted in this slice.
 
+## Workload routing
+
+`POST /api/workloads/route` accepts workload metadata and returns the deterministic execution-path decision without loading dataset records.
+
+Request:
+
+```json
+{
+  "row_count": 1000000,
+  "column_count": 40,
+  "estimated_bytes": 200000000,
+  "file_count": 1,
+  "requires_distributed": false
+}
+```
+
+Response `200` includes the selected `engine` (`LOCAL` or `SPARK`), the supplied workload metadata, and the active routing policy. The default policy routes to Spark when the workload explicitly requires distributed processing, exceeds 1,000,000 rows, exceeds 512 MiB, exceeds 500 columns, or contains more than 32 files. These are configurable engineering defaults, not a universal definition of Big Data.
+
+This endpoint exposes routing only. It does not persist the uploaded dataset or execute Spark. End-to-end dataset execution remains a later integration step because the current profile endpoint is intentionally request-scoped and bounded.
+
 ## Accept schema and assess feasibility
 
 `POST /api/datasets/{dataset_id}/schema` accepts `{"mappings":{"source_field":"canonical_field"}}`. A submitted mapping must name every source field exactly once, use a supported canonical HR field or `unknown`, and cannot assign one canonical field twice. This permits a user correction to an otherwise unknown source field. The temporary profile ID is created by the profiling endpoint and expires when the process restarts.
