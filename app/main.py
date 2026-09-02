@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -7,16 +8,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.models import (
-    DatasetExecutionResponse,
-    DatasetProfile,
-    SchemaAcceptanceRequest,
-    SchemaAcceptanceResponse,
-    TaskCandidateResponse,
-    TaskDetectionResponse,
-    WorkloadRoutingRequest,
-    WorkloadRoutingResponse,
-)
+from app.models import DatasetProfile, SchemaAcceptanceRequest, SchemaAcceptanceResponse, TaskCandidateResponse, TaskDetectionResponse, WorkloadRoutingRequest, WorkloadRoutingResponse
+from app.services.analytics import analyze_csv
 from app.services.big_data_engine import read_csv
 from app.services.capabilities import determine_capabilities
 from app.services.csv_ingestion import CsvValidationError, parse_csv
@@ -45,12 +38,16 @@ async def upload_and_profile_dataset(file: UploadFile = File(...)) -> DatasetPro
     payload = await file.read(settings.max_upload_bytes + 1)
     try:
         headers, rows = parse_csv(payload, max_bytes=settings.max_upload_bytes, max_rows=settings.max_profile_rows, max_columns=settings.max_columns)
-        profile = profile_dataset(headers, rows)
         dataset_id = str(uuid4())
+        stored = store.save_upload(dataset_id, file.filename or "dataset.csv", BytesIO(payload), settings.max_upload_bytes)
+        profile = profile_dataset(headers, rows)
         profile.dataset_id = dataset_id
+        profile.dataset_fingerprint = stored.sha256
         profiles[dataset_id] = profile
         return profile
     except CsvValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
@@ -62,8 +59,8 @@ def route_workload_api(request: WorkloadRoutingRequest) -> WorkloadRoutingRespon
     return WorkloadRoutingResponse(engine=engine.value, row_count=request.row_count, column_count=request.column_count, estimated_bytes=request.estimated_bytes, file_count=request.file_count, requires_distributed=request.requires_distributed, policy={"max_local_rows": policy.max_local_rows, "max_local_bytes": policy.max_local_bytes, "max_local_columns": policy.max_local_columns, "max_local_files": policy.max_local_files})
 
 
-@app.post("/api/datasets/execute", response_model=DatasetExecutionResponse)
-def execute_dataset(file: UploadFile = File(...)) -> DatasetExecutionResponse:
+@app.post("/api/datasets/execute")
+def execute_dataset(file: UploadFile = File(...)) -> dict[str, object]:
     if not (file.filename or "").lower().endswith(".csv"):
         raise HTTPException(status_code=415, detail="Only .csv files are supported for execution.")
     dataset_id = str(uuid4())
@@ -73,7 +70,7 @@ def execute_dataset(file: UploadFile = File(...)) -> DatasetExecutionResponse:
         engine = route_workload(workload)
         frame = read_csv(dataset.path, workload)
         del frame
-        return DatasetExecutionResponse(dataset_id=dataset.dataset_id, status="EXECUTED", engine=engine.value, row_count=dataset.row_count, column_count=dataset.column_count, size_bytes=dataset.size_bytes, dataset_fingerprint=dataset.sha256)
+        return {"dataset_id": dataset.dataset_id, "status": "EXECUTED", "engine": engine.value, "row_count": dataset.row_count, "column_count": dataset.column_count, "size_bytes": dataset.size_bytes, "dataset_fingerprint": dataset.sha256}
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except RuntimeError as error:
@@ -108,6 +105,22 @@ def detect_dataset_tasks(dataset_id: str) -> TaskDetectionResponse:
         raise HTTPException(status_code=409, detail="Confirm the dataset schema before detecting analytical tasks.")
     tasks = detect_tasks(mappings, profile.row_count)
     return TaskDetectionResponse(dataset_id=dataset_id, row_count=profile.row_count, tasks=[TaskCandidateResponse(objective=t.objective, status=t.status, target_field=t.target_field, feature_fields=list(t.feature_fields), reasons=list(t.reasons)) for t in tasks])
+
+
+@app.get("/api/datasets/{dataset_id}/analytics")
+def dataset_analytics(dataset_id: str) -> dict[str, object]:
+    profile = profiles.get(dataset_id)
+    mappings = accepted_mappings.get(dataset_id)
+    dataset = store.get(dataset_id)
+    if profile is None or mappings is None or dataset is None:
+        raise HTTPException(status_code=409, detail="Confirm the dataset schema before running analytics.")
+    try:
+        workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
+        engine = route_workload(workload)
+        result = analyze_csv(dataset.path, mappings)
+        return {"dataset_id": dataset_id, "engine": engine.value, **result}
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.get("/")
