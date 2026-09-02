@@ -14,6 +14,7 @@ from app.services.big_data_engine import read_csv
 from app.services.capabilities import determine_capabilities
 from app.services.csv_ingestion import CsvValidationError, parse_csv
 from app.services.dataset_store import store
+from app.services.insight_agent import synthesize
 from app.services.ml_engine import run_ml
 from app.services.profiling import canonical_fields, profile_dataset
 from app.services.task_detection import detect_tasks
@@ -142,6 +143,21 @@ def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+
+@app.get("/api/datasets/{dataset_id}/insights")
+def dataset_insights(dataset_id: str) -> dict[str, object]:
+    profile = profiles.get(dataset_id)
+    mappings = accepted_mappings.get(dataset_id)
+    dataset = store.get(dataset_id)
+    if profile is None or mappings is None or dataset is None:
+        raise HTTPException(status_code=409, detail="Confirm the dataset schema before synthesizing insights.")
+    try:
+        workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
+        analytics = {"dataset_id": dataset_id, "engine": route_workload(workload).value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analyze_csv(dataset.path, mappings)}
+        runs = [result for (stored_dataset, _), result in ml_runs.items() if stored_dataset == dataset_id]
+        return synthesize(analytics, runs) | {"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version}
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 @app.get("/")
 def index() -> FileResponse:
