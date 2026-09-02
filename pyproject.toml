@@ -16,6 +16,10 @@ bigdata = [
   "pyarrow>=17,<22",
   "pyspark>=3.5,<4",
 ]
+ml = [
+  "numpy>=1.26,<3",
+  "scikit-learn>=1.5,<2",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
