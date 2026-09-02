@@ -8,14 +8,17 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.models import (
+    DatasetExecutionResponse,
     DatasetProfile,
     SchemaAcceptanceRequest,
     SchemaAcceptanceResponse,
     WorkloadRoutingRequest,
     WorkloadRoutingResponse,
 )
+from app.services.big_data_engine import read_csv
 from app.services.capabilities import determine_capabilities
 from app.services.csv_ingestion import CsvValidationError, parse_csv
+from app.services.dataset_store import store
 from app.services.profiling import canonical_fields, profile_dataset
 from app.services.workload_router import RoutingPolicy, WorkloadProfile, route_workload
 
@@ -73,6 +76,45 @@ def route_workload_api(request: WorkloadRoutingRequest) -> WorkloadRoutingRespon
             "max_local_files": policy.max_local_files,
         },
     )
+
+
+@app.post("/api/datasets/execute", response_model=DatasetExecutionResponse)
+def execute_dataset(file: UploadFile = File(...)) -> DatasetExecutionResponse:
+    """Persist an upload to disk, route it, and execute a bounded read."""
+    if not (file.filename or "").lower().endswith(".csv"):
+        raise HTTPException(status_code=415, detail="Only .csv files are supported for execution.")
+    dataset_id = str(uuid4())
+    try:
+        dataset = store.save_upload(dataset_id, file.filename or "dataset.csv", file.file, settings.max_execution_upload_bytes)
+        workload = WorkloadProfile(
+            row_count=dataset.row_count,
+            column_count=dataset.column_count,
+            estimated_bytes=dataset.size_bytes,
+        )
+        engine = route_workload(workload)
+        frame = read_csv(dataset.path, workload)
+        # Reading is deliberately the first execution primitive. Later phases
+        # will apply task-specific transformations without collecting Spark data.
+        if engine.value == "LOCAL":
+            del frame
+        else:
+            del frame
+        return DatasetExecutionResponse(
+            dataset_id=dataset.dataset_id,
+            status="EXECUTED",
+            engine=engine.value,
+            row_count=dataset.row_count,
+            column_count=dataset.column_count,
+            size_bytes=dataset.size_bytes,
+            dataset_fingerprint=dataset.sha256,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except Exception as error:
+        # Do not expose internal paths, stack traces, or dataset contents.
+        raise HTTPException(status_code=500, detail="Dataset execution failed safely. Check the server logs for operational details.") from error
 
 
 @app.post("/api/datasets/{dataset_id}/schema", response_model=SchemaAcceptanceResponse)
