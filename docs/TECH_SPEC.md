@@ -20,7 +20,9 @@ The technical architecture must preserve the project's identity as an **end-to-e
 - Development agents: Antigravity/Jules/Codex as external development tooling, not application runtime dependencies
 
 ## Data paths
-Small datasets may use Pandas where it is materially simpler. Larger workloads should use Spark DataFrames and avoid unnecessary `collect()` operations. The system should make the processing-path decision based on measured/defined thresholds rather than using Spark merely as a label for Big Data.
+Small datasets may use Pandas where it is materially simpler. Larger workloads use Spark DataFrames and avoid unnecessary `collect()` operations. The processing-path decision is made by `app/services/workload_router.py` from configurable row, byte, column, file-count, and explicit distributed-workload signals. These are engineering defaults, not a universal definition of Big Data.
+
+M4 provides an engine-neutral execution layer in `app/services/big_data_engine.py`. CSV reads route to Pandas or Spark, analytical outputs can be written to Parquet without collecting Spark data to the driver, and grouped aggregations use the selected engine. Spark remains optional at installation time so local development does not require a JVM unless the Spark path is selected.
 
 ## Ingestion
 MVP: CSV upload.
