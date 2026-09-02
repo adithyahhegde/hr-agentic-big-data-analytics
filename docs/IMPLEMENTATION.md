@@ -40,15 +40,18 @@
 - [x] Train/test evaluation pipeline.
 - [x] Task-appropriate metrics and reproducible seed.
 - [x] Identifier/constant-feature exclusion and basic imbalance handling.
-- [x] K-Means clustering with candidate-k comparison and silhouette evidence.
-- [x] Isolation Forest anomaly detection with aggregate-only output.
-- [ ] Broader categorical feature preparation.
-- [ ] Native Spark ML training path.
+- [x] K-Means clustering with candidate-k comparison and silhouette evidence on local execution.
+- [x] Isolation Forest anomaly detection with aggregate-only output on local execution.
+- [x] Native Spark ML path for routed supervised classification/regression.
+- [x] Distributed Spark K-Means path for routed clustering workloads.
+- [ ] Broader categorical feature preparation in the local engine.
+- [ ] Distributed anomaly detection equivalent.
 
 ## Phase 6 — Explainability
-- [x] Structured feature-importance/permutation evidence for supported supervised models.
+- [x] Structured feature-importance/permutation evidence for supported local supervised models.
 - [x] Model-selection evidence surfaced in the UI.
 - [x] Dataset/schema/model provenance fields exposed by the API.
+- [x] Spark execution exposes explainability metadata and an explicit limitation when grouped attribution is unavailable.
 - [ ] SHAP integration for supported models.
 - [ ] Persistent explanation artifacts.
 
@@ -72,8 +75,8 @@
 - [x] Analytics dashboard tables.
 - [x] Model comparison and explanation presentation.
 - [x] SQLite-backed analytical run history.
+- [x] JSON and standalone HTML report exports.
 - [ ] Durable dataset persistence and multi-user lifecycle.
-- [ ] Export/reporting.
 
 ## Phase 10 — Evaluation
 - [ ] Functional tests for the new end-to-end workflow.
@@ -87,6 +90,6 @@
 A phase is complete only when implementation, tests, documentation, and known limitations agree. New functionality is therefore intentionally marked as implemented but not yet formally validated until the dedicated testing pass.
 
 ## Current status
-The product now spans upload, deterministic data health, canonical schema confirmation, task detection, descriptive analytics, bounded supervised ML comparison, clustering, anomaly detection, basic explainability, provenance, run history, and bounded evidence-to-action synthesis in one workflow. Supervised ML compares multiple local candidates on a held-out test set; unsupervised analysis compares K-Means cluster counts and uses Isolation Forest for aggregate outlier signals. The agentic layer consumes structured analytical outputs rather than unrestricted HR records and does not make employment decisions.
+The product now spans upload, deterministic data health, canonical schema confirmation, task detection, descriptive analytics, bounded supervised ML comparison, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering, basic explainability, provenance, persistent run history, reproducible JSON/HTML reporting, and bounded evidence-to-action synthesis in one workflow. The routing layer decides between local and Spark execution from workload characteristics; it is an engineering execution policy rather than a universal definition of Big Data. The agentic layer consumes structured analytical outputs rather than unrestricted HR records and does not make employment decisions.
 
-The remaining major product gaps are broader categorical feature preparation, native Spark ML execution, SHAP/persistent explanation artifacts, durable dataset lifecycle, exports/reporting, richer agent execution state, and then the dedicated robustness/benchmark test pass. No new ML test results are claimed in this document yet.
+The remaining major product gaps are broader local categorical feature preparation, distributed anomaly detection, SHAP/persistent explanation artifacts, durable dataset lifecycle, richer agent execution state, evidence-object-level recommendation citations, and then the dedicated robustness/benchmark test pass. No new ML test results are claimed in this document yet.
