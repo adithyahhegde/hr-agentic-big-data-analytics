@@ -23,9 +23,9 @@ Response `200`:
 
 Preconditions: `.csv` extension, UTF-8 (BOM allowed), non-empty payload, header row, non-blank unique trimmed names, configured resource limits, and no extra row values.
 
-Response `200` contains `row_count`, `column_count`, `duplicate_row_count`, `columns`, `mappings`, `issues`, `data_quality`, `llm_used`, `schema_version` (e.g. `"2.0.0"`), and `dataset_fingerprint` (SHA-256 hex digest of sorted headers). `columns[*]` includes source/normalized name, inferred type, non-null/null counts, `missing_percentage`, `unique_count`, `uniqueness_ratio`, bounded samples, and optional `numeric_stats` (`min`, `max`, `mean`, `zeros_count`, `negatives_count`). `mappings[source]` has `canonical_field`, confidence `0..1`, decision (`AUTO_MAPPED`, `NEEDS_REVIEW`, `UNMAPPED`), `evidence` reason codes, `alternatives` candidate list, and component scores (`name_score`, `type_score`, `value_score`, `profile_score`). `data_quality` contains `health_score` (0-100), summary `metrics` (completeness rate, duplicate rate, clean row rate, constant columns), evaluated `rules`, and issue counts by severity. Validation failures are `422`; unsupported files are `415`.
+Response `200` contains `row_count`, `column_count`, `duplicate_row_count`, `columns`, `mappings`, `issues`, `data_quality`, `llm_used`, `schema_version`, and `dataset_fingerprint`. This endpoint remains intentionally bounded for profiling.
 
-No source file, samples, or mapping is persisted in this slice.
+No source file, samples, or mapping is persisted by the profiling endpoint.
 
 ## Workload routing
 
@@ -45,7 +45,30 @@ Request:
 
 Response `200` includes the selected `engine` (`LOCAL` or `SPARK`), the supplied workload metadata, and the active routing policy. The default policy routes to Spark when the workload explicitly requires distributed processing, exceeds 1,000,000 rows, exceeds 512 MiB, exceeds 500 columns, or contains more than 32 files. These are configurable engineering defaults, not a universal definition of Big Data.
 
-This endpoint exposes routing only. It does not persist the uploaded dataset or execute Spark. End-to-end dataset execution remains a later integration step because the current profile endpoint is intentionally request-scoped and bounded.
+This endpoint exposes routing only; it does not persist or execute a dataset.
+
+## Execute a dataset
+
+`POST /api/datasets/execute` accepts one `.csv` upload. The file is streamed to process-local disk, counted without loading all records into application memory, routed using the M4 policy, and read through the selected execution engine.
+
+Response `200`:
+
+```json
+{
+  "dataset_id": "uuid",
+  "status": "EXECUTED",
+  "engine": "LOCAL",
+  "row_count": 100,
+  "column_count": 20,
+  "size_bytes": 12000,
+  "dataset_fingerprint": "sha256",
+  "warnings": []
+}
+```
+
+The execution upload has its own bounded size limit (`HR_ANALYTICS_MAX_EXECUTION_UPLOAD_BYTES`, default 2 GiB) so the profiling limit does not prevent genuine large-workload routing. Spark and local analytical dependencies remain optional installation extras. A missing selected engine dependency returns `503`; malformed uploads return `422`; unsupported extensions return `415`.
+
+The stored dataset is process-local and is not a durable database record. Later persistence work will add lifecycle management, provenance records, and analysis history.
 
 ## Accept schema and assess feasibility
 
