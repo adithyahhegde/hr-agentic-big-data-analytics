@@ -7,10 +7,17 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.models import DatasetProfile, SchemaAcceptanceRequest, SchemaAcceptanceResponse
+from app.models import (
+    DatasetProfile,
+    SchemaAcceptanceRequest,
+    SchemaAcceptanceResponse,
+    WorkloadRoutingRequest,
+    WorkloadRoutingResponse,
+)
 from app.services.capabilities import determine_capabilities
 from app.services.csv_ingestion import CsvValidationError, parse_csv
 from app.services.profiling import canonical_fields, profile_dataset
+from app.services.workload_router import RoutingPolicy, WorkloadProfile, route_workload
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version="0.1.0")
@@ -38,6 +45,34 @@ async def upload_and_profile_dataset(file: UploadFile = File(...)) -> DatasetPro
         return profile
     except CsvValidationError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/workloads/route", response_model=WorkloadRoutingResponse)
+def route_workload_api(request: WorkloadRoutingRequest) -> WorkloadRoutingResponse:
+    """Return a deterministic execution-path decision without loading dataset data."""
+    policy = RoutingPolicy()
+    workload = WorkloadProfile(
+        row_count=request.row_count,
+        column_count=request.column_count,
+        estimated_bytes=request.estimated_bytes,
+        file_count=request.file_count,
+        requires_distributed=request.requires_distributed,
+    )
+    engine = route_workload(workload, policy)
+    return WorkloadRoutingResponse(
+        engine=engine.value,
+        row_count=request.row_count,
+        column_count=request.column_count,
+        estimated_bytes=request.estimated_bytes,
+        file_count=request.file_count,
+        requires_distributed=request.requires_distributed,
+        policy={
+            "max_local_rows": policy.max_local_rows,
+            "max_local_bytes": policy.max_local_bytes,
+            "max_local_columns": policy.max_local_columns,
+            "max_local_files": policy.max_local_files,
+        },
+    )
 
 
 @app.post("/api/datasets/{dataset_id}/schema", response_model=SchemaAcceptanceResponse)
