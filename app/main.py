@@ -13,6 +13,7 @@ from app.services.analytics import analyze_csv
 from app.services.big_data_engine import read_csv
 from app.services.capabilities import determine_capabilities
 from app.services.csv_ingestion import CsvValidationError, parse_csv
+from app.services.dataset_registry import registry
 from app.services.dataset_store import store
 from app.services.heterogeneous_ml import run_heterogeneous_ml
 from app.services.insight_agent import synthesize
@@ -86,6 +87,17 @@ def execute_dataset(file: UploadFile = File(...)) -> dict[str, object]:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=500, detail="Dataset execution failed safely. Check the server logs for operational details.") from error
+
+@app.get("/api/datasets")
+def list_datasets(limit: int = 50) -> dict[str, object]:
+    return {"datasets": store.list(limit)}
+
+@app.get("/api/datasets/{dataset_id}")
+def dataset_manifest(dataset_id: str) -> dict[str, object]:
+    manifest = registry.get(dataset_id)
+    if manifest is None:
+        raise HTTPException(status_code=404, detail="Dataset not found.")
+    return manifest
 
 @app.post("/api/datasets/{dataset_id}/schema", response_model=SchemaAcceptanceResponse)
 def accept_schema(dataset_id: str, request: SchemaAcceptanceRequest) -> SchemaAcceptanceResponse:
