@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import os
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -13,6 +14,7 @@ class Settings:
     local_llm_base_url: str = "http://localhost:11434"
     local_llm_model: str = "llama3.2:3b"
     local_llm_timeout_seconds: float = 8.0
+    data_dir: Path = Path("data")
 
 
 def get_settings() -> Settings:
@@ -25,4 +27,5 @@ def get_settings() -> Settings:
         local_llm_base_url=os.getenv("HR_ANALYTICS_LOCAL_LLM_BASE_URL", "http://localhost:11434"),
         local_llm_model=os.getenv("HR_ANALYTICS_LOCAL_LLM_MODEL", "llama3.2:3b"),
         local_llm_timeout_seconds=float(os.getenv("HR_ANALYTICS_LOCAL_LLM_TIMEOUT_SECONDS", 8.0)),
+        data_dir=Path(os.getenv("HR_ANALYTICS_DATA_DIR", "data")),
     )
