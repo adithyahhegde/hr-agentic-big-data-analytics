@@ -9,7 +9,7 @@ from typing import Any
 
 
 class RunHistory:
-    def __init__(self, path: Path | str = "hr_analytics_history.sqlite3") -> None:
+    def __init__(self, path: Path | str = "data/hr_analytics.sqlite3") -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.path) as db:
@@ -41,18 +41,16 @@ class RunHistory:
         if operation:
             query += " AND operation=?"
             params.append(operation)
-        query += " ORDER BY id DESC LIMIT 1"
+        query += " AND status='SUCCEEDED' ORDER BY id DESC LIMIT 1"
         with sqlite3.connect(self.path) as db:
             db.row_factory = sqlite3.Row
             row = db.execute(query, params).fetchone()
         if not row:
             return None
-        result = dict(row)
         try:
-            result["result"] = json.loads(result.pop("result_json"))
+            return json.loads(row["result_json"])
         except (TypeError, json.JSONDecodeError):
-            result["result"] = {}
-        return result
+            return None
 
 
 history = RunHistory()
