@@ -75,9 +75,9 @@ def analyze_spark(path: Path, mappings: dict[str, str], max_categories: int = 5)
             .orderBy(F.desc("count"), F.asc("value"))
             .limit(max_categories)
             .collect()
+        )
         non_missing = df.filter(F.col(source).isNotNull() & (F.trim(F.col(source).cast("string")) != "")).count()
         distinct = df.select(F.col(source).cast("string")).where(F.col(source).isNotNull()).distinct().count()
-        total = sum(int(row["count"]) for row in counts)
         categorical_summary.append({
             "field": canonical,
             "count": non_missing,
