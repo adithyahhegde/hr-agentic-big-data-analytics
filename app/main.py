@@ -35,6 +35,30 @@ profiles: dict[str, DatasetProfile] = {}
 accepted_mappings: dict[str, dict[str, str]] = {}
 ml_runs: dict[tuple[str, str], dict[str, object]] = {}
 
+
+def _state(dataset_id: str) -> tuple[DatasetProfile | None, dict[str, str] | None]:
+    profile = profiles.get(dataset_id)
+    if profile is None:
+        payload = registry.get_profile(dataset_id)
+        if payload:
+            profile = DatasetProfile.model_validate(payload)
+            profiles[dataset_id] = profile
+    mappings = accepted_mappings.get(dataset_id)
+    if mappings is None:
+        mappings = registry.get_mappings(dataset_id)
+        if mappings is not None:
+            accepted_mappings[dataset_id] = mappings
+    return profile, mappings
+
+
+def _require_state(dataset_id: str) -> tuple[DatasetProfile, dict[str, str], object]:
+    profile, mappings = _state(dataset_id)
+    dataset = store.get(dataset_id)
+    if profile is None or mappings is None or dataset is None:
+        raise HTTPException(status_code=409, detail="Confirm the dataset schema before continuing.")
+    return profile, mappings, dataset
+
+
 @app.get("/api/health")
 def health() -> dict[str, object]:
     return {"status": "ok", "service": settings.app_name, "local_llm_enabled": settings.allow_local_llm}
@@ -56,6 +80,7 @@ async def upload_and_profile_dataset(file: UploadFile = File(...)) -> DatasetPro
         profile.dataset_id = dataset_id
         profile.dataset_fingerprint = stored.sha256
         profiles[dataset_id] = profile
+        registry.save_profile(dataset_id, profile)
         return profile
     except (CsvValidationError, ValueError) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
@@ -101,9 +126,9 @@ def dataset_manifest(dataset_id: str) -> dict[str, object]:
 
 @app.post("/api/datasets/{dataset_id}/schema", response_model=SchemaAcceptanceResponse)
 def accept_schema(dataset_id: str, request: SchemaAcceptanceRequest) -> SchemaAcceptanceResponse:
-    profile = profiles.get(dataset_id)
+    profile, _ = _state(dataset_id)
     if profile is None:
-        raise HTTPException(status_code=404, detail="The temporary dataset profile was not found. Upload the CSV again.")
+        raise HTTPException(status_code=404, detail="The dataset profile was not found. Upload the CSV again.")
     sources = {column.source_name for column in profile.columns}
     if set(request.mappings) != sources:
         raise HTTPException(status_code=422, detail="Mappings must include every source column exactly once.")
@@ -113,13 +138,14 @@ def accept_schema(dataset_id: str, request: SchemaAcceptanceRequest) -> SchemaAc
     if len(mapped_fields) != len(set(mapped_fields)):
         raise HTTPException(status_code=422, detail="Each canonical field may be assigned only once. Resolve mapping collisions first.")
     accepted_mappings[dataset_id] = request.mappings
+    registry.save_mappings(dataset_id, request.mappings)
     for key in [key for key in ml_runs if key[0] == dataset_id]:
         del ml_runs[key]
     return SchemaAcceptanceResponse(dataset_id=dataset_id, mappings=request.mappings, capabilities=determine_capabilities(request.mappings, profile.row_count))
 
 @app.get("/api/datasets/{dataset_id}/tasks", response_model=TaskDetectionResponse)
 def detect_dataset_tasks(dataset_id: str) -> TaskDetectionResponse:
-    profile = profiles.get(dataset_id); mappings = accepted_mappings.get(dataset_id)
+    profile, mappings = _state(dataset_id)
     if profile is None or mappings is None:
         raise HTTPException(status_code=409, detail="Confirm the dataset schema before detecting analytical tasks.")
     tasks = detect_tasks(mappings, profile.row_count)
@@ -127,8 +153,7 @@ def detect_dataset_tasks(dataset_id: str) -> TaskDetectionResponse:
 
 @app.get("/api/datasets/{dataset_id}/analytics")
 def dataset_analytics(dataset_id: str) -> dict[str, object]:
-    profile = profiles.get(dataset_id); mappings = accepted_mappings.get(dataset_id); dataset = store.get(dataset_id)
-    if profile is None or mappings is None or dataset is None: raise HTTPException(status_code=409, detail="Confirm the dataset schema before running analytics.")
+    profile, mappings, dataset = _require_state(dataset_id)
     try:
         workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes); engine = route_workload(workload)
         analytics_result = analyze_spark(dataset.path, mappings) if engine.value == "SPARK" else analyze_csv(dataset.path, mappings)
@@ -140,8 +165,7 @@ def dataset_analytics(dataset_id: str) -> dict[str, object]:
 
 @app.post("/api/datasets/{dataset_id}/ml/{objective}")
 def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
-    profile = profiles.get(dataset_id); mappings = accepted_mappings.get(dataset_id); dataset = store.get(dataset_id)
-    if profile is None or mappings is None or dataset is None: raise HTTPException(status_code=409, detail="Confirm the dataset schema before running ML.")
+    profile, mappings, dataset = _require_state(dataset_id)
     task = next((task for task in detect_tasks(mappings, profile.row_count) if task.objective == objective), None)
     if task is None: raise HTTPException(status_code=404, detail="Unknown analytical objective.")
     if task.status != "FEASIBLE" or not task.target_field: raise HTTPException(status_code=409, detail="This analytical task is currently blocked by the confirmed schema or dataset size.")
@@ -158,8 +182,7 @@ def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
 
 @app.post("/api/datasets/{dataset_id}/ml/{objective}/unsupervised")
 def run_dataset_unsupervised(dataset_id: str, objective: str) -> dict[str, object]:
-    profile = profiles.get(dataset_id); mappings = accepted_mappings.get(dataset_id); dataset = store.get(dataset_id)
-    if profile is None or mappings is None or dataset is None: raise HTTPException(status_code=409, detail="Confirm the dataset schema before running ML.")
+    profile, mappings, dataset = _require_state(dataset_id)
     task = next((task for task in detect_tasks(mappings, profile.row_count) if task.objective == objective), None)
     if task is None or objective not in {"employee_clustering", "anomaly_detection"}: raise HTTPException(status_code=404, detail="Unknown unsupervised analytical objective.")
     if task.status != "FEASIBLE": raise HTTPException(status_code=409, detail="This analytical task is currently blocked by the confirmed schema or dataset size.")
@@ -183,14 +206,13 @@ def dataset_runs(dataset_id: str, limit: int = 50) -> dict[str, object]:
 
 
 def _report(dataset_id: str) -> dict[str, object]:
-    profile = profiles.get(dataset_id); mappings = accepted_mappings.get(dataset_id); dataset = store.get(dataset_id)
-    if profile is None or mappings is None or dataset is None:
-        raise HTTPException(status_code=409, detail="Confirm the dataset schema before exporting a report.")
+    profile, mappings, dataset = _require_state(dataset_id)
     workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
     engine = route_workload(workload)
     analytics_result = analyze_spark(dataset.path, mappings) if engine.value == "SPARK" else analyze_csv(dataset.path, mappings)
     analytics = {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analytics_result}
-    runs = [result for (stored_dataset, _), result in ml_runs.items() if stored_dataset == dataset_id]
+    runs = [history.latest(dataset_id, objective) for objective in ("attrition_classification", "salary_regression", "employee_clustering", "anomaly_detection")]
+    runs = [run for run in runs if run]
     insights = synthesize(analytics, runs)
     return build_report(dataset_id, dataset.sha256, profile.schema_version, analytics, runs, insights)
 
