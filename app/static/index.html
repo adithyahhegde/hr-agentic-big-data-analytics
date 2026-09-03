@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Evidence-led HR analytics workbench for heterogeneous workforce datasets">
   <title>HR Analytics Workbench</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
@@ -12,17 +13,18 @@
     <div class="brand"><span class="brand-mark">HA</span><div><strong>HR Analytics</strong><small>Decision Workbench</small></div></div>
     <nav>
       <div class="nav-title">WORKFLOW</div>
-      <button class="nav-step active" data-step="1"><span>01</span>Dataset</button>
-      <button class="nav-step" data-step="2"><span>02</span>Data health</button>
-      <button class="nav-step" data-step="3"><span>03</span>Schema</button>
-      <button class="nav-step" data-step="4"><span>04</span>Analysis</button>
-      <button class="nav-step" data-step="5"><span>05</span>Insights</button>
+      <button class="nav-step active" data-step="1"><span>01</span><b>Dataset</b><em></em></button>
+      <button class="nav-step" data-step="2"><span>02</span><b>Data health</b><em></em></button>
+      <button class="nav-step" data-step="3"><span>03</span><b>Schema</b><em></em></button>
+      <button class="nav-step" data-step="4"><span>04</span><b>Analysis</b><em></em></button>
+      <button class="nav-step" data-step="5"><span>05</span><b>Insights</b><em></em></button>
     </nav>
     <div class="sidebar-note"><b>Privacy first</b><br>Uploaded HR data stays local to this application by default. External AI is not required for deterministic analysis.</div>
   </aside>
 
   <main class="workspace">
     <header class="topbar"><div><div class="eyebrow">Agentic Big Data Analytics</div><h1>HR Analytics Workbench</h1></div><div id="connection" class="connection"><i></i> System ready</div></header>
+    <div class="mobile-progress" aria-label="Workflow progress"><span class="progress-line"></span><span class="progress-fill" id="progress-fill"></span><b>01</b><b>02</b><b>03</b><b>04</b><b>05</b></div>
 
     <section id="step-1" class="step-panel active-panel">
       <div class="hero"><div><div class="section-kicker">01 / Dataset intake</div><h2>Start with your HR data.</h2><p>The platform profiles messy CSV data, evaluates quality, maps source fields to a canonical HR schema, detects feasible analyses, and produces evidence-backed findings.</p></div></div>
@@ -30,44 +32,45 @@
         <div class="upload-icon">↑</div><h3>Drop a CSV dataset here</h3><p>or choose a file from your device</p>
         <input id="dataset" name="file" type="file" accept=".csv,text/csv" required>
         <label for="dataset" class="file-button">Choose CSV</label><div id="file-name" class="file-name">No file selected</div>
-        <button type="submit" class="primary" id="analyze-upload">Profile dataset</button>
+        <button type="submit" class="primary" id="analyze-upload">Profile dataset <span>→</span></button>
+        <div class="upload-meta"><span>CSV only</span><span>Local processing</span><span>Schema-aware</span></div>
       </form>
-      <div id="status" class="status" role="status"></div>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
     </section>
 
     <section id="step-2" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">02 / Data health</div><h2>Is the dataset trustworthy enough to analyse?</h2></div><button class="secondary" data-back="1">Back</button></div>
+      <div class="section-head"><div><div class="section-kicker">02 / Data health</div><h2>Is the dataset trustworthy enough to analyse?</h2></div><button class="secondary" data-back="1">← Back</button></div>
       <div id="summary" class="metric-grid"></div>
       <div class="panel"><div class="panel-head"><h3>Quality assessment</h3><span id="quality-label" class="status-badge"></span></div><div id="dq-metrics" class="metric-grid compact"></div></div>
-      <div class="panel"><h3>Quality rules</h3><table><thead><tr><th>Rule</th><th>Category</th><th>Status</th><th>Finding</th></tr></thead><tbody id="dq-rule-rows"></tbody></table></div>
-      <div class="step-actions"><button class="primary" data-next="3">Continue to schema</button></div>
+      <div class="panel"><h3>Quality rules</h3><div class="table-wrap"><table><thead><tr><th>Rule</th><th>Category</th><th>Status</th><th>Finding</th></tr></thead><tbody id="dq-rule-rows"></tbody></table></div></div>
+      <div class="step-actions"><button class="primary" data-next="3">Continue to schema <span>→</span></button></div>
     </section>
 
     <section id="step-3" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">03 / Schema understanding</div><h2>Review how the platform understands your columns.</h2><p id="mapping-summary"></p></div><button class="secondary" data-back="2">Back</button></div>
-      <div class="notice">Automatic mappings use multiple evidence signals. Ambiguous fields remain reviewable. You can always choose <b>Unknown</b> rather than forcing a semantic guess.</div>
+      <div class="section-head"><div><div class="section-kicker">03 / Schema understanding</div><h2>Review how the platform understands your columns.</h2><p id="mapping-summary"></p></div><button class="secondary" data-back="2">← Back</button></div>
+      <div class="notice"><strong>Review before execution</strong><span>Automatic mappings use multiple evidence signals. Ambiguous fields remain reviewable. Choose <b>Unknown</b> rather than forcing a semantic guess.</span></div>
       <div class="panel table-panel"><table><thead><tr><th>Source field</th><th>Type</th><th>Missing</th><th>Suggested field</th><th>Confidence</th><th>Evidence</th></tr></thead><tbody id="mapping-rows"></tbody></table></div>
-      <div class="step-actions"><button id="confirm-schema" class="primary">Confirm schema & detect analyses</button></div>
-      <div id="schema-status" class="status"></div>
+      <div class="step-actions"><button id="confirm-schema" class="primary">Confirm schema & detect analyses <span>→</span></button></div>
+      <div id="schema-status" class="status" role="status" aria-live="polite"></div>
     </section>
 
     <section id="step-4" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">04 / Analysis workspace</div><h2>What can this dataset support?</h2><p>Tasks are proposed only when the confirmed schema and dataset size provide sufficient evidence.</p></div><button class="secondary" data-back="3">Back</button></div>
+      <div class="section-head"><div><div class="section-kicker">04 / Analysis workspace</div><h2>What can this dataset support?</h2><p>Tasks are proposed only when the confirmed schema and dataset size provide sufficient evidence.</p></div><button class="secondary" data-back="3">← Back</button></div>
       <div id="task-grid" class="task-grid"></div>
       <div class="panel"><div class="panel-head"><h3>Deterministic descriptive analytics</h3><span id="engine-badge" class="engine-badge"></span></div><div id="analysis-metrics" class="metric-grid compact"></div></div>
-      <div class="panel"><h3>Numeric fields</h3><table><thead><tr><th>Field</th><th>Count</th><th>Minimum</th><th>Mean</th><th>Maximum</th></tr></thead><tbody id="numeric-rows"></tbody></table></div>
-      <div class="panel"><h3>Categorical fields</h3><table><thead><tr><th>Field</th><th>Distinct</th><th>Most common values</th></tr></thead><tbody id="categorical-rows"></tbody></table></div>
-      <div class="panel"><div class="panel-head"><h3>Predictive modelling</h3><span id="ml-engine-badge" class="engine-badge">Auto-routed</span></div><p class="panel-copy">The workbench compares multiple candidates on a held-out test set. Small workloads stay local; workloads that exceed routing thresholds use distributed Spark ML where supported.</p><div id="ml-actions" class="ml-actions"></div><div id="ml-status" class="status"></div></div>
-      <div class="step-actions"><button class="primary" data-next="5">View evidence & insights</button></div>
+      <div class="panel"><div class="panel-head"><h3>Numeric fields</h3><span class="table-caption">Confirmed canonical fields</span></div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Count</th><th>Minimum</th><th>Mean</th><th>Maximum</th></tr></thead><tbody id="numeric-rows"></tbody></table></div></div>
+      <div class="panel"><div class="panel-head"><h3>Categorical fields</h3><span class="table-caption">Top observed values</span></div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Distinct</th><th>Most common values</th></tr></thead><tbody id="categorical-rows"></tbody></table></div></div>
+      <div class="panel"><div class="panel-head"><h3>Predictive modelling</h3><span id="ml-engine-badge" class="engine-badge">Auto-routed</span></div><p class="panel-copy">The workbench compares multiple candidates on a held-out test set. Small workloads stay local; workloads that exceed routing thresholds use distributed Spark ML where supported.</p><div id="ml-actions" class="ml-actions"></div><div id="ml-status" class="status" role="status" aria-live="polite"></div></div>
+      <div class="step-actions"><button class="primary" data-next="5">View evidence & insights <span>→</span></button></div>
     </section>
 
     <section id="step-5" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">05 / Evidence & insights</div><h2>What does the data actually tell us?</h2><p>Findings are tied to computed analytics or evaluated model evidence. They are not automated employment decisions.</p></div><button class="secondary" data-back="4">Back</button></div>
+      <div class="section-head"><div><div class="section-kicker">05 / Evidence & insights</div><h2>What does the data actually tell us?</h2><p>Findings are tied to computed analytics or evaluated model evidence. They are not automated employment decisions.</p></div><button class="secondary" data-back="4">← Back</button></div>
       <div id="insight-list" class="insight-list"></div>
       <div class="panel"><h3>Model evaluation</h3><div id="ml-results"></div></div>
       <div class="panel"><div class="panel-head"><h3>Bounded agentic synthesis</h3><span class="engine-badge">Evidence only</span></div><p class="panel-copy">The synthesis layer consumes structured findings, ranks evidence, and proposes reversible investigation/remediation actions. It does not access unrestricted HR records or make employment decisions.</p><div id="agent-insights"></div></div>
-      <div class="panel provenance"><div class="panel-head"><h3>Run provenance</h3><span class="engine-badge">Reproducible report</span></div><div id="provenance"></div><div class="export-actions"><a id="json-report" class="secondary" target="_blank" rel="noopener">Open JSON report</a><a id="html-report" class="secondary" target="_blank" rel="noopener">Open HTML report</a></div></div>
-      <div class="finish"><div><b>Analysis workspace ready.</b><p>The workbench now supports local and routed distributed ML, aggregate unsupervised analysis, persistent run history and reproducible report exports.</p></div><button class="secondary" onclick="location.reload()">Start another dataset</button></div>
+      <div class="panel provenance"><div class="panel-head"><h3>Run provenance</h3><span class="engine-badge">Reproducible report</span></div><div id="provenance"></div><div class="export-actions"><a id="json-report" class="secondary" target="_blank" rel="noopener">Open JSON report ↗</a><a id="html-report" class="secondary" target="_blank" rel="noopener">Open HTML report ↗</a></div></div>
+      <div class="finish"><div><b>Analysis workspace ready.</b><p>The workbench supports local and routed distributed ML, aggregate unsupervised analysis, persistent run history and reproducible report exports.</p></div><button class="secondary" onclick="location.reload()">Start another dataset</button></div>
     </section>
   </main>
 </div>
