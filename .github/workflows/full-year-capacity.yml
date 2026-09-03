@@ -1,0 +1,23 @@
+name: Full-Year Capacity Decision Study
+on:
+  push:
+    branches: [research-full-year-capacity]
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install duckdb pandas numpy scikit-learn xgboost pyarrow
+      - name: Run full 2024 analysis
+        run: python research_capacity/run_full_year.py
+      - name: Upload empirical results
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-year-capacity-results
+          path: research_capacity/results/
