@@ -1,13 +1,13 @@
-"""Local dataset storage with a durable manifest registry."""
+"""Persistent local dataset storage with a durable manifest registry."""
 from __future__ import annotations
 
 import csv
 import hashlib
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
+from app.config import get_settings
 from app.services.dataset_registry import registry
 
 
@@ -24,32 +24,36 @@ class StoredDataset:
 
 class DatasetStore:
     def __init__(self) -> None:
-        self._root = Path(tempfile.mkdtemp(prefix="hr_analytics_"))
+        settings = get_settings()
+        self._root = settings.data_dir / "datasets"
+        self._root.mkdir(parents=True, exist_ok=True)
         self._datasets: dict[str, StoredDataset] = {}
 
     def save_upload(self, dataset_id: str, filename: str, stream: BinaryIO, max_bytes: int) -> StoredDataset:
         path = self._root / f"{dataset_id}.csv"
         total = 0
         digest = hashlib.sha256()
-        with path.open("wb") as output:
-            while True:
-                chunk = stream.read(1024 * 1024)
-                if not chunk:
-                    break
-                total += len(chunk)
-                if total > max_bytes:
-                    path.unlink(missing_ok=True)
-                    raise ValueError("The uploaded file exceeds the configured execution size limit.")
-                digest.update(chunk)
-                output.write(chunk)
-        if total == 0:
+        try:
+            with path.open("wb") as output:
+                while True:
+                    chunk = stream.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise ValueError("The uploaded file exceeds the configured execution size limit.")
+                    digest.update(chunk)
+                    output.write(chunk)
+            if total == 0:
+                raise ValueError("The uploaded dataset is empty.")
+            row_count, column_count = self._count_csv(path)
+            dataset = StoredDataset(dataset_id, path, filename, total, row_count, column_count, digest.hexdigest())
+            self._datasets[dataset_id] = dataset
+            registry.register(dataset)
+            return dataset
+        except Exception:
             path.unlink(missing_ok=True)
-            raise ValueError("The uploaded dataset is empty.")
-        row_count, column_count = self._count_csv(path)
-        dataset = StoredDataset(dataset_id, path, filename, total, row_count, column_count, digest.hexdigest())
-        self._datasets[dataset_id] = dataset
-        registry.register(dataset)
-        return dataset
+            raise
 
     @staticmethod
     def _count_csv(path: Path) -> tuple[int, int]:
