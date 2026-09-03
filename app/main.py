@@ -21,6 +21,7 @@ from app.services.profiling import canonical_fields, profile_dataset
 from app.services.report_export import build_report, to_html
 from app.services.run_history import history
 from app.services.spark_anomaly import run_distributed_anomaly
+from app.services.spark_analytics import analyze_spark
 from app.services.spark_ml_engine import run_spark_clustering, run_spark_ml
 from app.services.task_detection import detect_tasks
 from app.services.workload_router import RoutingPolicy, WorkloadProfile, route_workload
@@ -118,10 +119,12 @@ def dataset_analytics(dataset_id: str) -> dict[str, object]:
     if profile is None or mappings is None or dataset is None: raise HTTPException(status_code=409, detail="Confirm the dataset schema before running analytics.")
     try:
         workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes); engine = route_workload(workload)
-        result = {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analyze_csv(dataset.path, mappings)}
+        analytics_result = analyze_spark(dataset.path, mappings) if engine.value == "SPARK" else analyze_csv(dataset.path, mappings)
+        result = {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analytics_result}
         history.record(dataset_id, dataset.sha256, "descriptive_analytics", "SUCCEEDED", result, engine.value)
         return result
     except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error: raise HTTPException(status_code=503, detail=str(error)) from error
 
 @app.post("/api/datasets/{dataset_id}/ml/{objective}")
 def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
@@ -173,7 +176,8 @@ def _report(dataset_id: str) -> dict[str, object]:
         raise HTTPException(status_code=409, detail="Confirm the dataset schema before exporting a report.")
     workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
     engine = route_workload(workload)
-    analytics = {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analyze_csv(dataset.path, mappings)}
+    analytics_result = analyze_spark(dataset.path, mappings) if engine.value == "SPARK" else analyze_csv(dataset.path, mappings)
+    analytics = {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analytics_result}
     runs = [result for (stored_dataset, _), result in ml_runs.items() if stored_dataset == dataset_id]
     insights = synthesize(analytics, runs)
     return build_report(dataset_id, dataset.sha256, profile.schema_version, analytics, runs, insights)
