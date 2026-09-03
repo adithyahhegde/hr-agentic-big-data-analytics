@@ -1,8 +1,4 @@
-"""Process-local dataset storage for the M4 execution boundary.
-
-Uploaded CSVs are streamed to local disk rather than retained in application
-memory. Durable persistence belongs to the later persistence phase.
-"""
+"""Local dataset storage with a durable manifest registry."""
 from __future__ import annotations
 
 import csv
@@ -11,6 +7,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
+
+from app.services.dataset_registry import registry
 
 
 @dataclass(frozen=True)
@@ -50,6 +48,7 @@ class DatasetStore:
         row_count, column_count = self._count_csv(path)
         dataset = StoredDataset(dataset_id, path, filename, total, row_count, column_count, digest.hexdigest())
         self._datasets[dataset_id] = dataset
+        registry.register(dataset)
         return dataset
 
     @staticmethod
@@ -67,7 +66,25 @@ class DatasetStore:
             raise ValueError("The CSV could not be parsed. Check delimiters and quoting.") from exc
 
     def get(self, dataset_id: str) -> StoredDataset | None:
-        return self._datasets.get(dataset_id)
+        dataset = self._datasets.get(dataset_id)
+        if dataset:
+            return dataset
+        manifest = registry.get(dataset_id)
+        if not manifest:
+            return None
+        path = Path(manifest["path"])
+        if not path.exists():
+            return None
+        dataset = StoredDataset(
+            dataset_id=manifest["dataset_id"], path=path, filename=manifest["filename"],
+            size_bytes=int(manifest["size_bytes"]), row_count=int(manifest["row_count"]),
+            column_count=int(manifest["column_count"]), sha256=manifest["fingerprint"],
+        )
+        self._datasets[dataset_id] = dataset
+        return dataset
+
+    def list(self, limit: int = 50) -> list[dict[str, object]]:
+        return registry.list(limit)
 
 
 store = DatasetStore()
