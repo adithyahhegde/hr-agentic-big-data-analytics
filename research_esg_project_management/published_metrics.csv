@@ -1,0 +1,13 @@
+metric,dimension,benchmark_value,unit,benchmark_verified_in_published_html
+Water use,Environmental,32000,gallons per $1 million (2020 USD) project bid price,yes
+Vegetated area,Environmental,28,percent of total area,yes
+Stormwater runoff treatment,Environmental,,,no
+Lighting power,Environmental,,,no
+Construction waste generation,Environmental,,,no
+Local materials use,Social,,,no
+Pedestrian area,Social,,,no
+Bicycle facilities,Social,,,no
+Recycled content,Environmental,,,no
+Pavement reuse,Environmental,,,no
+Project greenhouse gas emissions,Environmental,,,no
+Project energy consumption,Environmental,,,no
