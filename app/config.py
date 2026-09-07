@@ -14,6 +14,7 @@ class Settings:
     local_llm_base_url: str = "http://localhost:11434"
     local_llm_model: str = "llama3.2:3b"
     local_llm_timeout_seconds: float = 8.0
+    automl_time_budget_seconds: int = 30
     data_dir: Path = Path("data")
 
 
@@ -27,5 +28,6 @@ def get_settings() -> Settings:
         local_llm_base_url=os.getenv("HR_ANALYTICS_LOCAL_LLM_BASE_URL", "http://localhost:11434"),
         local_llm_model=os.getenv("HR_ANALYTICS_LOCAL_LLM_MODEL", "llama3.2:3b"),
         local_llm_timeout_seconds=float(os.getenv("HR_ANALYTICS_LOCAL_LLM_TIMEOUT_SECONDS", 8.0)),
+        automl_time_budget_seconds=max(1, min(600, int(os.getenv("HR_ANALYTICS_AUTOML_TIME_BUDGET_SECONDS", 30)))),
         data_dir=Path(os.getenv("HR_ANALYTICS_DATA_DIR", "data")),
     )
