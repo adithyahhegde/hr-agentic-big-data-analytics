@@ -64,6 +64,18 @@ def test_dataset_registry_reregister_preserves_profile_and_mappings(tmp_path: Pa
     assert registry.get_mappings("ds-1") == {"employee_id": "employee_id", "salary": "salary"}
 
 
+def test_run_history_failure_does_not_persist_exception_message(tmp_path: Path):
+    history = RunHistory(tmp_path / "history.sqlite3")
+    secret = "E1,Adithya,50000"
+    history.record_failure("ds-1", "b" * 64, "ml", ValueError(secret), "LOCAL")
+
+    latest = history.list("ds-1")[0]
+    assert latest["status"] == "FAILED"
+    assert secret not in str(latest)
+    stored = history.latest("ds-1", "ml")
+    assert stored is None
+
+
 def test_run_history_persists_success_and_failure_provenance(tmp_path: Path):
     history = RunHistory(tmp_path / "history.sqlite3")
     success_id = history.record("ds-1", "b" * 64, "analytics", "SUCCEEDED", {"schema_version": "2.0.0", "value": 42}, "LOCAL")
