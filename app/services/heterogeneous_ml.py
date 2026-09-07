@@ -1,7 +1,6 @@
 """Local ML execution for mixed numeric/categorical HR predictors."""
 from __future__ import annotations
 
-import csv
 from pathlib import Path
 from typing import Any
 
@@ -59,7 +58,8 @@ def run_heterogeneous_ml(path: Path, mappings: dict[str, str], objective: str, t
         X[column] = X[column].astype("string")
 
     numeric_pipe = Pipeline([("imputer", SimpleImputer(strategy="median")), ("scale", StandardScaler())])
-    categorical_pipe = Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("onehot", OneHotEncoder(handle_unknown="ignore", min_frequency=2))])
+    # Bound categorical dimensionality so a high-cardinality HR field cannot create an unbounded feature matrix.
+    categorical_pipe = Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("onehot", OneHotEncoder(handle_unknown="ignore", min_frequency=2, max_categories=100))])
     preprocessor = ColumnTransformer([("numeric", numeric_pipe, numeric), ("categorical", categorical_pipe, categorical)], remainder="drop")
     try:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=seed, stratify=y if classification else None)
@@ -129,6 +129,6 @@ def run_heterogeneous_ml(path: Path, mappings: dict[str, str], objective: str, t
         "models": results, "selected_model": best["model"],
         "selection_metric": "f1" if classification else "rmse",
         "explainability": {"method": "encoded_model_importance", "top_features": top_features},
-        "preparation": {"numeric_imputation": "median", "categorical_imputation": "most_frequent", "categorical_encoding": "one_hot", "unknown_category_policy": "ignore"},
-        "safeguards": ["confirmed target only", "identifier exclusion", "constant predictors handled by model preprocessing", "reproducible holdout seed", "no external model API", "no raw records returned"],
+        "preparation": {"numeric_imputation": "median", "categorical_imputation": "most_frequent", "categorical_encoding": "one_hot", "unknown_category_policy": "ignore", "max_categories_per_field": 100},
+        "safeguards": ["confirmed target only", "identifier exclusion", "bounded categorical encoding", "reproducible holdout seed", "no external model API", "no raw records returned"],
     }
