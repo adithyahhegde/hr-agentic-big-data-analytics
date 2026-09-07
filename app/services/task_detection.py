@@ -43,15 +43,25 @@ def _fields(mappings: dict[str, str]) -> dict[str, list[str]]:
 
 
 def _usable_features(mappings: dict[str, str], target: str | None = None) -> tuple[str, ...]:
-    """Return canonical feature names, matching the ML execution contract."""
-    return tuple(
-        canonical for canonical in mappings.values()
-        if canonical in SUPPORTED_ANALYTICAL_FIELDS
-        and canonical not in IDENTIFIER_FIELDS
-        and canonical != target
-        and canonical != "attrition"
-        and canonical != "salary"
-    )
+    """Return confirmed canonical predictor fields in stable input order.
+
+    The previous implementation excluded ``salary`` and ``attrition`` for every
+    objective, which could silently erase valid predictors and leave the ML
+    execution layer with an empty feature set. Only identifiers, unknown fields,
+    and the current target are excluded here.
+    """
+    seen: set[str] = set()
+    features: list[str] = []
+    for canonical in mappings.values():
+        if canonical in seen:
+            continue
+        if canonical not in SUPPORTED_ANALYTICAL_FIELDS:
+            continue
+        if canonical in IDENTIFIER_FIELDS or canonical == "unknown" or canonical == target:
+            continue
+        seen.add(canonical)
+        features.append(canonical)
+    return tuple(features)
 
 
 def detect_tasks(mappings: dict[str, str], row_count: int) -> list[TaskCandidate]:
