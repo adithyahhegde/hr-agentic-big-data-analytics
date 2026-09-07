@@ -43,8 +43,9 @@ def _fields(mappings: dict[str, str]) -> dict[str, list[str]]:
 
 
 def _usable_features(mappings: dict[str, str], target: str | None = None) -> tuple[str, ...]:
+    """Return canonical feature names, matching the ML execution contract."""
     return tuple(
-        source for source, canonical in mappings.items()
+        canonical for canonical in mappings.values()
         if canonical in SUPPORTED_ANALYTICAL_FIELDS
         and canonical not in IDENTIFIER_FIELDS
         and canonical != target
