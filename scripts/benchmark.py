@@ -23,6 +23,16 @@ SCHEMA_SCENARIOS = {
     "messy": {"Employee ID": "employee_id", "Employee Age": "age", "Dept": "department", "Annual Pay": "salary", "Performance": "performance_rating", "Bonus Pay": "bonus", "Left Company": "attrition"},
     "categorical": {"Employee ID": "employee_id", "Department": "department", "Performance": "performance_rating", "Attrition": "attrition"},
     "mixed": MAPPINGS,
+    "ambiguous": {"Employee ID": "employee_id", "Worker ID": "employee_id", "Age": "age", "Department": "department", "Salary": "salary", "Attrition": "attrition"},
+    "leakage_prone": {**MAPPINGS, "Salary Copy": "salary", "Attrition Copy": "attrition"},
+}
+SCENARIO_EXPECTATIONS = {
+    "clean": {"schema_gate": "ACCEPTABLE"},
+    "messy": {"schema_gate": "ACCEPTABLE"},
+    "categorical": {"schema_gate": "ACCEPTABLE"},
+    "mixed": {"schema_gate": "ACCEPTABLE"},
+    "ambiguous": {"schema_gate": "BLOCKED_COLLISION"},
+    "leakage_prone": {"schema_gate": "BLOCKED_COLLISION"},
 }
 DEPARTMENTS = ("Engineering", "Sales", "Finance", "HR", "Operations")
 
@@ -70,9 +80,20 @@ def run(rows: int, seed: int, scenario: str = "clean") -> dict[str, Any]:
         make_fixture(path, rows, seed, scenario)
         size_bytes = path.stat().st_size
         routed = route_workload(WorkloadProfile(row_count=rows, column_count=len(mappings), estimated_bytes=size_bytes))
-        start = time.perf_counter(); local = analyze_csv(path, mappings); local_elapsed = time.perf_counter() - start
         tasks = detect_tasks(mappings, rows)
-        output: dict[str, Any] = {"fixture": {"rows": rows, "seed": seed, "bytes": size_bytes, "scenario": scenario}, "routing": {"selected_engine": routed.value}, "local": summarize(local, local_elapsed, size_bytes), "task_detection": {"feasible": sorted(t.objective for t in tasks if t.status == "FEASIBLE"), "blocked": sorted(t.objective for t in tasks if t.status == "BLOCKED")}}
+        output: dict[str, Any] = {
+            "fixture": {"rows": rows, "seed": seed, "bytes": size_bytes, "scenario": scenario},
+            "routing": {"selected_engine": routed.value},
+            "schema_gate": SCENARIO_EXPECTATIONS[scenario]["schema_gate"],
+            "task_detection": {"feasible": sorted(t.objective for t in tasks if t.status == "FEASIBLE"), "blocked": sorted(t.objective for t in tasks if t.status == "BLOCKED")},
+        }
+        # Collision/leakage fixtures intentionally exercise the pre-execution
+        # schema gate; do not pretend they are valid analytical inputs.
+        if SCENARIO_EXPECTATIONS[scenario]["schema_gate"] != "ACCEPTABLE":
+            output["local"] = {"available": False, "skipped": True, "reason": "schema_gate_blocked"}
+            return output
+        start = time.perf_counter(); local = analyze_csv(path, mappings); local_elapsed = time.perf_counter() - start
+        output["local"] = summarize(local, local_elapsed, size_bytes)
         try:
             from app.services.spark_analytics import analyze_spark
             start = time.perf_counter(); spark = analyze_spark(path, mappings); spark_elapsed = time.perf_counter() - start
