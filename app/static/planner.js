@@ -1,8 +1,8 @@
-/* Progressive-disclosure planning UI. The main app keeps schema mechanics
-   separate; this layer presents the planning agent after schema confirmation. */
+/* Progressive-disclosure planning UI. Schema mechanics stay hidden by default;
+   the planning surface explains why an investigation was selected and can launch it. */
 (() => {
   const style = document.createElement('style');
-  style.textContent = `.schema-details{padding:0;overflow:hidden}.schema-details summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:15px;align-items:center;padding:16px 18px;font-size:12px}.schema-details summary::-webkit-details-marker{display:none}.schema-details summary span{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#74818b}.schema-details[open] summary{border-bottom:1px solid #e2e6ea}.agent-plan{padding:20px;margin-top:0}.agent-plan-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.agent-plan-head h3{font-size:18px;margin:5px 0}.agent-plan-head p{font-size:11px;color:#697782;margin:0;max-width:650px}.agent-mode{font-size:9px;text-transform:uppercase;letter-spacing:.08em;border:1px solid #cbd3d9;padding:6px 8px;color:#61707b;white-space:nowrap}.agent-primary-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;font-weight:800;color:#64737e;margin:18px 0 7px}.agent-plan-card{border:1px solid #d9dfe4;padding:15px;margin:8px 0;background:#fafbfb}.agent-plan-card.primary-plan{border-left:3px solid #263641;background:#fff}.plan-meta{display:flex;gap:10px;align-items:center;font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#78858f}.priority{font-weight:800}.priority.high{color:#263641}.priority.medium{color:#536371}.priority.low{color:#7c8993}.agent-plan-card h3{font-size:14px;margin:7px 0 4px}.plan-question{font-weight:650!important;color:#33434e!important}.agent-plan-card p{font-size:11px;color:#697782;margin:5px 0}.plan-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:11px}.plan-steps span{border-top:1px solid #dfe4e8;padding-top:7px;font-size:10px;color:#65737e}.plan-steps b{display:inline-grid;place-items:center;width:17px;height:17px;border:1px solid #cbd3d9;border-radius:50%;font-size:8px;margin-right:5px}.agent-plan-details{border-top:1px solid #e2e6ea;margin-top:12px;padding-top:10px}.agent-plan-details summary{cursor:pointer;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#5e6d78}.agent-plan-details p{font-size:10px;color:#73808a;max-width:800px}.agent-plan-loading,.agent-plan-error,.agent-plan-empty{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#64727d}.agent-plan-error{color:#7b4a4a}.agent-plan-error small{color:#7a8791}.spinner{display:inline-block;width:12px;height:12px;border:2px solid #d0d7dc;border-top-color:#263641;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:7px}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:720px){.agent-plan-head{flex-direction:column}.plan-steps{grid-template-columns:1fr 1fr}.agent-mode{align-self:flex-start}}@media(max-width:560px){.plan-steps{grid-template-columns:1fr}}`;
+  style.textContent = `.agent-plan{padding:22px;margin-top:0;background:#fbfaf7}.agent-plan-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-start}.agent-plan-head h3{font-size:21px;margin:4px 0 5px;letter-spacing:-.02em}.agent-plan-head p{font-size:11px;color:#697873;margin:0;max-width:720px}.agent-mode{font-size:8px;text-transform:uppercase;letter-spacing:.09em;border:1px solid #bdc9c2;padding:6px 8px;color:#536760;white-space:nowrap}.agent-primary-label{font-size:8px;text-transform:uppercase;letter-spacing:.12em;font-weight:850;color:#6a7972;margin:20px 0 7px}.agent-plan-card{border:1px solid #d9ddd8;padding:17px;margin:9px 0;background:#f7f7f3;transition:border-color .15s,transform .15s}.agent-plan-card:hover{border-color:#9aaca4;transform:translateY(-1px)}.agent-plan-card.primary-plan{background:#fff;border-left:3px solid #285650}.plan-meta{display:flex;gap:10px;align-items:center;font-size:8px;text-transform:uppercase;letter-spacing:.07em;color:#77847e}.priority{font-weight:850}.priority.high{color:#285650}.priority.medium{color:#536760}.priority.low{color:#7d8984}.agent-plan-card h3{font-size:15px;margin:7px 0 4px}.plan-question{font-weight:700!important;color:#304441!important}.agent-plan-card p{font-size:10px;color:#6a7771;margin:5px 0}.plan-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px}.plan-steps span{border-top:1px solid #dfe3de;padding-top:7px;font-size:9px;color:#68766f}.plan-steps b{display:inline-grid;place-items:center;width:17px;height:17px;border:1px solid #c8d1cb;border-radius:50%;font-size:8px;margin-right:5px}.plan-run{margin-top:13px}.agent-plan-details{border-top:1px solid #e0e3de;margin-top:13px;padding-top:10px}.agent-plan-details summary{cursor:pointer;font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#5e6d66}.agent-plan-details p{font-size:10px;color:#738078;max-width:800px}.agent-plan-loading,.agent-plan-error,.agent-plan-empty{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#64736d}.agent-plan-error{color:#7b4a4a}.agent-plan-error small{color:#7a8781}@media(max-width:720px){.agent-plan-head{flex-direction:column}.plan-steps{grid-template-columns:1fr 1fr}.agent-mode{align-self:flex-start}}@media(max-width:560px){.plan-steps{grid-template-columns:1fr}.agent-plan-card{padding:14px}}`;
   document.head.appendChild(style);
 
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -29,7 +29,7 @@
       if (!response.ok) throw new Error(plan.detail || 'Planning unavailable');
       render(host, plan);
     } catch (error) {
-      host.innerHTML = `<div class="agent-plan-error"><b>Planning agent unavailable.</b><span>${escapeHtml(error.message)}</span><small>The deterministic analysis controls remain available below.</small></div>`;
+      host.innerHTML = `<div class="agent-plan-error"><b>Planning agent unavailable.</b><span>${escapeHtml(error.message)}</span><small>The validated capability map remains available below.</small></div>`;
     }
   }
 
@@ -38,7 +38,6 @@
       host.innerHTML = '<div class="agent-plan-empty"><b>No investigation is currently feasible.</b><span>The confirmed schema and dataset-size safeguards did not establish a supported analytical objective.</span></div>';
       return;
     }
-    const primary = plan.plans[0];
     const cards = plan.plans.map((item, index) => `
       <article class="agent-plan-card ${index === 0 ? 'primary-plan' : ''}">
         <div class="plan-meta"><span class="priority ${escapeHtml(item.priority).toLowerCase()}">${escapeHtml(item.priority)} PRIORITY</span><span>${escapeHtml(item.method)}</span></div>
@@ -46,11 +45,26 @@
         <p class="plan-question">${escapeHtml(item.question)}</p>
         <p>${escapeHtml(item.agent_reason || item.reasons?.join(' ') || 'Selected from validated analytical capabilities.')}</p>
         <div class="plan-steps">${(item.steps || []).map((step, i) => `<span><b>${i + 1}</b>${escapeHtml(step)}</span>`).join('')}</div>
+        <div class="plan-run"><button class="secondary agent-plan-run" data-objective="${escapeHtml(item.objective)}">Explore this investigation →</button></div>
       </article>`).join('');
     host.innerHTML = `
-      <div class="agent-plan-head"><div><div class="section-kicker">AGENT / ANALYTICAL PLANNING</div><h3>Recommended investigation</h3><p>The agent selected from feasible capabilities only. It cannot invent targets or unsupported analyses.</p></div><span class="agent-mode">${escapeHtml(plan.mode.replaceAll('_', ' '))}</span></div>
-      <div class="agent-primary-label">Start here</div>
+      <div class="agent-plan-head"><div><div class="section-kicker">ANALYTICAL PLANNER</div><h3>The workspace found useful questions before asking you to choose a model.</h3><p>Only validated objectives are supplied to the planner. The planner orders them, explains the reasoning, and hands execution to deterministic analytical tools.</p></div><span class="agent-mode">${escapeHtml((plan.mode || 'planner').replaceAll('_', ' '))}</span></div>
+      <div class="agent-primary-label">Recommended investigations</div>
       ${cards}
-      <details class="agent-plan-details"><summary>Why this plan?</summary><p>The plan is grounded in the confirmed schema and deterministic feasibility gates. The execution layer still chooses and validates suitable model candidates; the planner does not bypass those safeguards.</p><p>Primary objective: <b>${escapeHtml(primary.title)}</b></p></details>`;
+      <details class="agent-plan-details"><summary>How the planner is constrained</summary><p>The planner cannot invent a target, alter a canonical field, or call arbitrary tools. It receives feasible candidates from the deterministic capability layer and may only rank those candidates when a local LLM is enabled.</p><p>Planning mode: <b>${escapeHtml(plan.mode || 'guardrailed')}</b></p></details>`;
+
+    host.querySelectorAll('.agent-plan-run').forEach(button => {
+      button.addEventListener('click', () => {
+        const objective = button.dataset.objective;
+        const target = document.querySelector(`.ml-button[data-objective="${CSS.escape(objective)}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.click();
+        } else {
+          const status = document.querySelector('#ml-status');
+          if (status) status.textContent = `The execution control for ${objective.replaceAll('_', ' ')} is not currently available.`;
+        }
+      });
+    });
   }
 })();
