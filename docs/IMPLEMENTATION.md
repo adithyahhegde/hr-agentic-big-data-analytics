@@ -74,7 +74,7 @@
 - [x] Unsupervised segmentation/anomaly evidence cards.
 - [x] Conservative recommendation generation from verified evidence.
 - [x] Explicit limitations and non-decision safeguards.
-- [ ] Evidence-linked recommendation citations at individual evidence-object level.
+- [x] Evidence-linked recommendation citations at individual evidence-object level.
 
 ## Phase 9 — Persistence and UI
 - [x] End-to-end workflow UI.
@@ -93,7 +93,7 @@
 - [ ] Full robustness matrix across clean/messy/ambiguous/categorical/mixed datasets.
 - [ ] Scalability measurements at multiple dataset sizes.
 - [ ] Comparative schema-mapping evaluation against baseline methods.
-- [ ] Objective-feasibility evaluation.
+- [x] Executable objective-feasibility evaluation protocol against explicit fixture-contract labels and a weak baseline (empirical execution still outstanding).
 - [ ] End-to-end agent reliability/abstention evaluation.
 - [ ] Documentation consistency audit after final feature freeze.
 
