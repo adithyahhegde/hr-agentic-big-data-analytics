@@ -29,7 +29,7 @@ python scripts/benchmark.py --rows 100000 --seed 42 --scenario clean --output be
 python scripts/benchmark.py --matrix --seed 42 --output benchmark-matrix.json
 ```
 
-The harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, task-feasibility results, and aggregate consistency checks. It does not print or persist employee-level records. The matrix currently covers clean, renamed, categorical, and mixed schema conditions across configurable row-counts; missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy fixtures remain separate evaluation extensions.
+The harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, task-feasibility results, and aggregate consistency checks. It does not print or persist employee-level records. The matrix currently covers clean, renamed, categorical, and mixed schema conditions plus deliberately invalid ambiguous/leakage-prone mappings. Invalid mapping scenarios are reported as `BLOCKED_COLLISION` and are not executed as if they were valid analytical inputs; missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy fixtures remain separate evaluation extensions.
 
 ## Functional metrics
 
@@ -66,4 +66,4 @@ Report both successes and abstentions/failures. A useful evaluation should demon
 
 ## Current evidence status
 
-The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
+The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix and explicit schema-gate handling for ambiguous/leakage-prone mappings. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
