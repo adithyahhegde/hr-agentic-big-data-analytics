@@ -4,15 +4,25 @@ A local-first HR analytics workbench for heterogeneous and messy workforce datas
 
 ## Current product
 
-The application now provides an end-to-end analytical workflow:
+The application provides an end-to-end analytical workflow:
 
-`CSV upload → data health → canonical HR schema review → feasible-task detection → descriptive analytics → model comparison → explainability evidence → insights/provenance`
+`CSV upload → data health → canonical HR schema review → feasible-task detection → descriptive analytics → model comparison → explainability evidence → bounded insights → provenance/report`
 
-The product automatically profiles uploaded data, evaluates quality rules, proposes schema mappings with confidence/evidence, lets the user confirm or reject mappings, detects feasible analytical objectives, routes workloads between local and Spark execution policies, computes descriptive analytics, and can compare multiple supervised ML candidates for feasible attrition-classification and salary-regression tasks.
+The system automatically profiles uploaded data, evaluates data-quality rules, proposes canonical HR schema mappings with confidence/evidence, blocks unresolved mapping collisions, lets the user confirm mappings, detects feasible analytical objectives, routes workloads between local and Spark execution policies, computes descriptive analytics, and compares multiple supervised ML candidates for feasible classification/regression tasks. It also supports local clustering/anomaly detection and routed Spark execution for supervised ML, clustering, and distributed anomaly screening.
 
-ML execution is deliberately bounded and deterministic: only confirmed targets are used; identifier-like and constant predictors are excluded; a reproducible held-out split is used; task-appropriate metrics are reported; and feature-importance/permutation evidence is returned with the selected model. The system does not make automated employment decisions.
+ML execution is deliberately bounded and deterministic: only confirmed targets are used; identifier-like and constant predictors are excluded; reproducible evaluation is used; task-appropriate metrics are reported; and explainability evidence is surfaced with explicit limitations. The system does not make automated employment decisions.
 
-The interface is intentionally designed as an analytics workbench rather than a generic AI chatbot. Numerical findings and model metrics are computed locally; the optional local LLM is not required for the core workflow.
+The agentic layer is a constrained evidence synthesizer rather than an unrestricted data-science chatbot. It consumes structured analytical outputs, generates conservative investigation actions, records provenance, and never receives unrestricted raw HR records. The optional local LLM is not required for the core workflow.
+
+## Big-data execution
+
+Workloads are routed using explicit engineering thresholds for row count, estimated bytes, column count, file count, or an explicit distributed requirement. Small workloads use the lightweight local path; routed large workloads use Spark. Spark execution is currently local-distributed (`local[*]`) and is intended as a reproducible scalable-processing path, not a claim that every dataset is universally "Big Data".
+
+## Persistence and reproducibility
+
+Uploaded datasets are stored under the configured local data directory (`HR_ANALYTICS_DATA_DIR`, default `data/`). SQLite stores dataset manifests, profiling state, confirmed schema mappings, and analytical run history. Dataset fingerprints, schema versions, execution engines, and run provenance are retained so the workflow can be recovered after process restart when the configured data directory persists.
+
+Runtime data is excluded from Git by `.gitignore`.
 
 ## Run locally
 
@@ -22,14 +32,32 @@ Create an environment and install the project with the desired extras, then run:
 
 Open `http://127.0.0.1:8000`.
 
-For supervised ML, install the `ml` extra. For Spark/large-data execution, install the `bigdata` extra. These extras keep the base application lightweight.
+- Base install: upload, profiling, schema, routing and deterministic analytics foundation.
+- `ml` extra: local heterogeneous supervised/unsupervised ML.
+- `bigdata` extra: PySpark-backed large-data analytics and Spark ML.
+- `dev` extra: test tooling.
+
+The benchmark harness can compare local and Spark descriptive execution when PySpark is installed:
+
+`python scripts/benchmark.py --rows 100000 --seed 42`
+
+## Research/evaluation status
+
+The project deliberately makes **no broad novelty or "first" claim**. Existing agentic data-science, enterprise analytics, workforce analytics and HR decision-support systems overlap with the broad concept. The research direction is narrower: evaluate whether confidence-aware HR schema interpretation, objective-feasibility gates, evidence-bounded planning/synthesis, scalable routing, and provenance improve reliability on heterogeneous HR datasets.
+
+The repository includes deterministic benchmark generation plus regression tests for routing, data quality, schema interpretation, persistence/provenance, bounded synthesis, report privacy, and benchmark behavior. CI installs the lightweight `dev,ml` environment; Spark remains an optional dependency and is handled explicitly by the benchmark harness.
+
+Formal comparative robustness/scalability results should only be reported after the benchmark protocol has been executed and recorded. Do not infer research performance from unit-test counts.
 
 ## Product boundary
 
-This is an expanding research-grade product foundation, not yet the final evaluated research system. The remaining major layers are agentic evidence synthesis/recommendations, broader feature preparation, native Spark ML, clustering/anomaly execution, SHAP-based explanations, durable persistence, reporting/export, and formal benchmark/robustness testing.
+This is a research-grade implementation foundation, not a validated production HR decision system. Important limitations include:
 
-Uploads used by the profiling workflow are stored temporarily on local disk so the confirmed schema and subsequent analysis can reuse the same dataset. Durable production persistence/lifecycle management is not yet implemented.
+- Spark uses local distributed execution unless deployed against an external Spark cluster.
+- Distributed anomaly detection is a scalable z-score screening method, not an exact distributed equivalent of every local detector.
+- Spark explainability is currently more limited than local feature-importance/permutation evidence.
+- Statistical/predictive evidence is associative and does not establish causality.
+- Recommendations require human review and must not be used as automated hiring, firing, promotion, or compensation decisions.
+- The current workflow is primarily CSV-based and single-application/local-storage oriented.
 
-No new ML test results are claimed until the dedicated end-to-end testing and benchmark pass.
-
-See `docs/MVP_SPEC.md`, `docs/API_CONTRACTS.md`, and `docs/IMPLEMENTATION.md` for current contracts, implementation status, and known boundaries.
+See `docs/MVP_SPEC.md`, `docs/API_CONTRACTS.md`, `docs/AGENT_ENGINE.md`, `docs/IMPLEMENTATION.md`, `docs/RESEARCH_GAP.md`, and `docs/EVALUATION_PROTOCOL.md` for contracts, architecture, research positioning, and evaluation methodology.
