@@ -21,7 +21,7 @@ def test_execute_dataset_streams_to_store_and_returns_routing_metadata(monkeypat
     assert len(body["dataset_fingerprint"]) == 64
 
 
-def test_execute_dataset_rejects_non_csv():
+def test_execute_dataset_rejects_non_csv_file():
     response = client.post(
         "/api/datasets/execute",
         files={"file": ("workforce.txt", b"emp_no\n1\n", "text/plain")},
@@ -39,4 +39,5 @@ def test_execute_dataset_returns_safe_error_when_engine_dependency_is_missing(mo
         files={"file": ("workforce.csv", b"emp_no\n1\n", "text/csv")},
     )
     assert response.status_code == 503
-    assert "pyspark" in response.json()["detail"]
+    assert response.json()["detail"] == "Execution dependency unavailable."
+    assert "pyspark" not in response.text
