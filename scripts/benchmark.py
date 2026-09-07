@@ -25,16 +25,36 @@ SCHEMA_SCENARIOS = {
     "mixed": MAPPINGS,
     "ambiguous": {"Employee ID": "employee_id", "Worker ID": "employee_id", "Age": "age", "Department": "department", "Salary": "salary", "Attrition": "attrition"},
     "leakage_prone": {**MAPPINGS, "Salary Copy": "salary", "Attrition Copy": "attrition"},
+    "missing_heavy": MAPPINGS,
+    "duplicate_heavy": MAPPINGS,
+    "high_cardinality": MAPPINGS,
+    "outlier_heavy": MAPPINGS,
 }
 SCENARIO_EXPECTATIONS = {
-    "clean": {"schema_gate": "ACCEPTABLE"},
-    "messy": {"schema_gate": "ACCEPTABLE"},
-    "categorical": {"schema_gate": "ACCEPTABLE"},
-    "mixed": {"schema_gate": "ACCEPTABLE"},
-    "ambiguous": {"schema_gate": "BLOCKED_COLLISION"},
-    "leakage_prone": {"schema_gate": "BLOCKED_COLLISION"},
+    "clean": {"schema_gate": "ACCEPTABLE"}, "messy": {"schema_gate": "ACCEPTABLE"},
+    "categorical": {"schema_gate": "ACCEPTABLE"}, "mixed": {"schema_gate": "ACCEPTABLE"},
+    "ambiguous": {"schema_gate": "BLOCKED_COLLISION"}, "leakage_prone": {"schema_gate": "BLOCKED_COLLISION"},
+    "missing_heavy": {"schema_gate": "ACCEPTABLE"}, "duplicate_heavy": {"schema_gate": "ACCEPTABLE"},
+    "high_cardinality": {"schema_gate": "ACCEPTABLE"}, "outlier_heavy": {"schema_gate": "ACCEPTABLE"},
 }
 DEPARTMENTS = ("Engineering", "Sales", "Finance", "HR", "Operations")
+
+
+def _values(rng: random.Random, i: int, scenario: str) -> dict[str, Any]:
+    age, salary, performance = rng.randint(21, 60), rng.randint(35000, 180000), rng.randint(1, 5)
+    bonus = round(salary * rng.uniform(0.02, 0.18), 2)
+    attrition = "Yes" if rng.random() < 0.16 else "No"
+    department = rng.choice(DEPARTMENTS)
+    if scenario == "high_cardinality":
+        department = f"Unit-{i:06d}"
+    if scenario == "outlier_heavy" and i % 10 == 0:
+        age, salary, bonus = 99, 2_000_000, 500_000
+    values = {"employee_id": i, "age": age, "department": department, "salary": salary, "performance_rating": performance, "bonus": bonus, "attrition": attrition}
+    if scenario == "missing_heavy":
+        for canonical in ("age", "department", "salary", "bonus"):
+            if i % 2 == 0:
+                values[canonical] = ""
+    return values
 
 
 def make_fixture(path: Path, rows: int, seed: int, scenario: str = "clean") -> None:
@@ -50,18 +70,8 @@ def make_fixture(path: Path, rows: int, seed: int, scenario: str = "clean") -> N
         writer = csv.writer(handle)
         writer.writerow(headers)
         for i in range(1, rows + 1):
-            age, salary, performance = rng.randint(21, 60), rng.randint(35000, 180000), rng.randint(1, 5)
-            bonus = round(salary * rng.uniform(0.02, 0.18), 2)
-            attrition = "Yes" if rng.random() < 0.16 else "No"
-            values = {
-                "employee_id": i,
-                "age": age,
-                "department": rng.choice(DEPARTMENTS),
-                "salary": salary,
-                "performance_rating": performance,
-                "bonus": bonus,
-                "attrition": attrition,
-            }
+            source_i = ((i - 1) % max(1, rows // 5)) + 1 if scenario == "duplicate_heavy" else i
+            values = _values(rng, source_i, scenario)
             writer.writerow(tuple(values[canonical] for canonical in mappings.values()))
 
 
@@ -81,14 +91,7 @@ def run(rows: int, seed: int, scenario: str = "clean") -> dict[str, Any]:
         size_bytes = path.stat().st_size
         routed = route_workload(WorkloadProfile(row_count=rows, column_count=len(mappings), estimated_bytes=size_bytes))
         tasks = detect_tasks(mappings, rows)
-        output: dict[str, Any] = {
-            "fixture": {"rows": rows, "seed": seed, "bytes": size_bytes, "scenario": scenario},
-            "routing": {"selected_engine": routed.value},
-            "schema_gate": SCENARIO_EXPECTATIONS[scenario]["schema_gate"],
-            "task_detection": {"feasible": sorted(t.objective for t in tasks if t.status == "FEASIBLE"), "blocked": sorted(t.objective for t in tasks if t.status == "BLOCKED")},
-        }
-        # Collision/leakage fixtures intentionally exercise the pre-execution
-        # schema gate; do not pretend they are valid analytical inputs.
+        output: dict[str, Any] = {"fixture": {"rows": rows, "seed": seed, "bytes": size_bytes, "scenario": scenario}, "routing": {"selected_engine": routed.value}, "schema_gate": SCENARIO_EXPECTATIONS[scenario]["schema_gate"], "task_detection": {"feasible": sorted(t.objective for t in tasks if t.status == "FEASIBLE"), "blocked": sorted(t.objective for t in tasks if t.status == "BLOCKED")}}
         if SCENARIO_EXPECTATIONS[scenario]["schema_gate"] != "ACCEPTABLE":
             output["local"] = {"available": False, "skipped": True, "reason": "schema_gate_blocked"}
             return output
