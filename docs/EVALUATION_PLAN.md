@@ -20,16 +20,17 @@ Evaluate the system as an evidence-led heterogeneous HR analytics pipeline, not 
 | High-cardinality categorical data | bounded categorical summaries |
 | Outlier-heavy numeric data | anomaly-screen behaviour and limitations |
 
-The deterministic fixture generator lives at `scripts/generate_hr_data.py`. The benchmark harness at `scripts/benchmark.py` now supports a reproducible scenario/size matrix as well as a single fixture run.
+The deterministic fixture generator lives at `scripts/generate_hr_data.py`. The benchmark harness at `scripts/benchmark.py` now supports a reproducible scenario/size matrix as well as a single fixture run. Objective-feasibility evaluation is available at `scripts/feasibility_evaluation.py` and compares the pipeline's decisions with fixture-contract labels and a deliberately weak target-presence baseline.
 
 Examples:
 
 ```bash
 python scripts/benchmark.py --rows 100000 --seed 42 --scenario clean --output benchmark.json
 python scripts/benchmark.py --matrix --seed 42 --output benchmark-matrix.json
+python scripts/feasibility_evaluation.py --sizes 10 20 100 --seed 42 --output feasibility.json
 ```
 
-The harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, task-feasibility results, and aggregate consistency checks. It does not print or persist employee-level records. The matrix currently covers clean, renamed, categorical, and mixed schema conditions plus deliberately invalid ambiguous/leakage-prone mappings. Invalid mapping scenarios are reported as `BLOCKED_COLLISION` and are not executed as if they were valid analytical inputs; missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy fixtures remain separate evaluation extensions.
+The benchmark harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, task-feasibility results, and aggregate consistency checks. It does not print or persist employee-level records. The matrix currently covers clean, renamed, categorical, and mixed schema conditions plus deliberately invalid ambiguous/leakage-prone mappings. Invalid mapping scenarios are reported as `BLOCKED_COLLISION` and are not executed as if they were valid analytical inputs; missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy fixtures remain separate evaluation extensions.
 
 ## Functional metrics
 
@@ -41,6 +42,8 @@ The harness reports elapsed time, throughput, row/duplicate counts, selected rou
 - no raw employee records in ML/agent/report outputs
 - report provenance completeness
 - failure responses are structured and recorded in run history
+
+The objective-feasibility runner is an executable protocol for the task-feasibility metric. Its fixture labels are explicit benchmark assumptions, not measurements of real-world HR datasets. The output should therefore be reported as a benchmark result only after execution in the target environment.
 
 ## Scalability metrics
 
@@ -66,4 +69,4 @@ Report both successes and abstentions/failures. A useful evaluation should demon
 
 ## Current evidence status
 
-The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix and explicit schema-gate handling for ambiguous/leakage-prone mappings. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
+The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix and explicit schema-gate handling for ambiguous/leakage-prone mappings. Objective-feasibility evaluation is now executable with a transparent weak baseline, but no empirical accuracy claim is made until the runner is executed in the target environment. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
