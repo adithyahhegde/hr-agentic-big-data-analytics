@@ -34,14 +34,36 @@ class DatasetRegistry:
             db.commit()
 
     def register(self, dataset: Any) -> None:
+        """Insert a manifest or refresh its metadata without losing workflow state."""
+        created_at = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.path) as db:
-            db.execute("""INSERT OR REPLACE INTO datasets
-                (dataset_id,fingerprint,filename,path,size_bytes,row_count,column_count,created_at,status,profile_json,mappings_json)
-                VALUES(?,?,?,?,?,?,?,?,?,?,COALESCE((SELECT mappings_json FROM datasets WHERE dataset_id=?),NULL))""", (
-                dataset.dataset_id, dataset.sha256, dataset.filename, str(dataset.path),
-                dataset.size_bytes, dataset.row_count, dataset.column_count,
-                datetime.now(timezone.utc).isoformat(), "STORED", None, dataset.dataset_id,
-            ))
+            db.execute(
+                """INSERT INTO datasets
+                    (dataset_id,fingerprint,filename,path,size_bytes,row_count,column_count,created_at,status,profile_json,mappings_json)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(dataset_id) DO UPDATE SET
+                        fingerprint=excluded.fingerprint,
+                        filename=excluded.filename,
+                        path=excluded.path,
+                        size_bytes=excluded.size_bytes,
+                        row_count=excluded.row_count,
+                        column_count=excluded.column_count,
+                        status=excluded.status
+                """,
+                (
+                    dataset.dataset_id,
+                    dataset.sha256,
+                    dataset.filename,
+                    str(dataset.path),
+                    dataset.size_bytes,
+                    dataset.row_count,
+                    dataset.column_count,
+                    created_at,
+                    "STORED",
+                    None,
+                    None,
+                ),
+            )
             db.commit()
 
     def save_profile(self, dataset_id: str, profile: Any) -> None:
