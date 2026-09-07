@@ -20,7 +20,7 @@ Evaluate the system as an evidence-led heterogeneous HR analytics pipeline, not 
 | High-cardinality categorical data | bounded categorical summaries |
 | Outlier-heavy numeric data | anomaly-screen behaviour and limitations |
 
-The deterministic fixture generator lives at `scripts/generate_hr_data.py`. The benchmark harness at `scripts/benchmark.py` now supports a reproducible scenario/size matrix as well as a single fixture run. Objective-feasibility evaluation is available at `scripts/feasibility_evaluation.py` and compares the pipeline's decisions with fixture-contract labels and a deliberately weak target-presence baseline.
+The deterministic fixture generator lives at `scripts/generate_hr_data.py`. The benchmark harness at `scripts/benchmark.py` supports a reproducible scenario/size matrix and now generates distinct missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy fixtures in addition to clean, renamed, categorical, mixed, ambiguous, and leakage-prone scenarios. Objective-feasibility evaluation is available at `scripts/feasibility_evaluation.py` and compares the pipeline's decisions with fixture-contract labels and a deliberately weak target-presence baseline.
 
 Examples:
 
@@ -32,7 +32,7 @@ python scripts/feasibility_evaluation.py --sizes 10 20 100 --seed 42 --output fe
 
 A GitHub Actions evaluation workflow at `.github/workflows/evaluation.yml` executes the feasibility protocol and benchmark matrix on relevant `main` changes and manual dispatch. It uploads the generated JSON outputs as a 30-day workflow artifact and fails if the deterministic fixture-contract assertions do not hold. This creates an executable validation path; it does not substitute for target-environment Spark scalability measurements.
 
-The benchmark harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, task-feasibility results, and aggregate consistency checks. It does not print or persist employee-level records. The matrix currently covers clean, renamed, categorical, and mixed schema conditions plus deliberately invalid ambiguous/leakage-prone mappings. Invalid mapping scenarios are reported as `BLOCKED_COLLISION` and are not executed as if they were valid analytical inputs; missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy fixtures remain separate evaluation extensions.
+The benchmark harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, task-feasibility results, and aggregate consistency checks. It does not print or persist employee-level records. The matrix covers clean, renamed, categorical, mixed, missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy conditions plus deliberately invalid ambiguous/leakage-prone mappings. Invalid mapping scenarios are reported as `BLOCKED_COLLISION` and are not executed as if they were valid analytical inputs.
 
 ## Functional metrics
 
@@ -71,4 +71,4 @@ Report both successes and abstentions/failures. A useful evaluation should demon
 
 ## Current evidence status
 
-The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix and explicit schema-gate handling for ambiguous/leakage-prone mappings. Objective-feasibility evaluation is executable with a transparent weak baseline. The new CI workflow executes both protocols automatically, but no empirical accuracy or scalability claim is made here until workflow artifacts are inspected and, for Spark claims, the target environment has been measured. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
+The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix, explicit schema-gate handling for ambiguous/leakage-prone mappings, and executable data-quality stress fixtures. Objective-feasibility evaluation is executable with a transparent weak baseline. The new CI workflow executes both protocols automatically, but no empirical accuracy or scalability claim is made here until workflow artifacts are inspected and, for Spark claims, the target environment has been measured. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
