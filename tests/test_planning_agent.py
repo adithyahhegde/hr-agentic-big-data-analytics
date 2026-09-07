@@ -7,9 +7,13 @@ def _task(objective, target=None, features=("age", "department")):
     return TaskCandidate(objective, "FEASIBLE", target, features, ("validated capability",))
 
 
+def _blocked_task(objective, target=None):
+    return TaskCandidate(objective, "BLOCKED", target, (), ("blocked",))
+
+
 def test_planner_selects_only_feasible_objectives_offline():
     result = plan_analyses(
-        [_task("attrition_classification", "attrition"), TaskCandidate("salary_regression", "salary", (), ("blocked",))],
+        [_task("attrition_classification", "attrition"), _blocked_task("salary_regression", "salary")],
         Settings(allow_local_llm=False),
     )
     assert result["agent"] == "bounded_analytical_planner_v1"
