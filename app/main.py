@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
+import secrets
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -38,6 +39,20 @@ accepted_mappings: dict[str, dict[str, str]] = {}
 ml_runs: dict[tuple[str, str], dict[str, object]] = {}
 
 
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    """Optionally protect API endpoints with a constant-time API-key check.
+
+    Authentication is disabled when HR_ANALYTICS_API_KEY is unset. Health remains
+    public so orchestrators can probe the service without credentials.
+    """
+    if settings.api_key and request.url.path.startswith("/api/") and request.url.path != "/api/health":
+        supplied = request.headers.get("X-API-Key", "")
+        if not supplied or not secrets.compare_digest(supplied, settings.api_key):
+            return JSONResponse(status_code=401, content={"detail": "Authentication required."})
+    return await call_next(request)
+
+
 def _record_api_failure(request: Request, status_code: int, error_type: str) -> None:
     """Persist execution failures without exposing diagnostic exception details."""
     if status_code < 422:
@@ -54,7 +69,6 @@ def _record_api_failure(request: Request, status_code: int, error_type: str) -> 
         operation = "api:" + "/".join(parts[3:]) if len(parts) > 3 else "api:dataset"
         history.record_failure_safe(dataset_id, fingerprint, operation, error_type)
     except Exception:
-        # Failure persistence must never mask the original API response.
         return
 
 

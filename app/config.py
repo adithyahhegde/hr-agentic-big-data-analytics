@@ -16,6 +16,7 @@ class Settings:
     local_llm_timeout_seconds: float = 8.0
     automl_time_budget_seconds: int = 30
     data_dir: Path = Path("data")
+    api_key: str = ""
 
 
 def get_settings() -> Settings:
@@ -30,4 +31,5 @@ def get_settings() -> Settings:
         local_llm_timeout_seconds=float(os.getenv("HR_ANALYTICS_LOCAL_LLM_TIMEOUT_SECONDS", 8.0)),
         automl_time_budget_seconds=max(1, min(600, int(os.getenv("HR_ANALYTICS_AUTOML_TIME_BUDGET_SECONDS", 30)))),
         data_dir=Path(os.getenv("HR_ANALYTICS_DATA_DIR", "data")),
+        api_key=os.getenv("HR_ANALYTICS_API_KEY", ""),
     )
