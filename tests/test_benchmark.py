@@ -48,3 +48,33 @@ def test_benchmark_matrix_is_reproducible_and_covers_all_scenarios():
     assert result["scenarios"] == list(SCHEMA_SCENARIOS)
     assert len(result["results"]) == 2 * len(SCHEMA_SCENARIOS)
     assert all("task_detection" in item for item in result["results"])
+
+
+def test_data_quality_scenarios_exercise_distinct_fixture_behaviour(tmp_path: Path):
+    missing = tmp_path / "missing.csv"
+    duplicate = tmp_path / "duplicate.csv"
+    high_cardinality = tmp_path / "high_cardinality.csv"
+    outlier = tmp_path / "outlier.csv"
+    make_fixture(missing, rows=20, seed=42, scenario="missing_heavy")
+    make_fixture(duplicate, rows=20, seed=42, scenario="duplicate_heavy")
+    make_fixture(high_cardinality, rows=20, seed=42, scenario="high_cardinality")
+    make_fixture(outlier, rows=20, seed=42, scenario="outlier_heavy")
+
+    assert len(missing.read_text(encoding="utf-8").splitlines()) == 21
+    with duplicate.open(newline="", encoding="utf-8") as handle:
+        duplicate_rows = list(csv.reader(handle))[1:]
+    assert len(set(tuple(row) for row in duplicate_rows)) < len(duplicate_rows)
+    with high_cardinality.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.reader(handle))[1:]
+    assert len({row[2] for row in rows}) == 20
+    with outlier.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.reader(handle))[1:]
+    assert any(row[3] == "2000000" for row in rows)
+
+
+def test_data_quality_scenarios_remain_analytically_runnable():
+    for scenario in ("missing_heavy", "duplicate_heavy", "high_cardinality", "outlier_heavy"):
+        result = run(rows=20, seed=42, scenario=scenario)
+        assert result["schema_gate"] == "ACCEPTABLE"
+        assert result["local"]["rows"] == 20
+        assert result["local"]["duplicate_rows"] >= 0
