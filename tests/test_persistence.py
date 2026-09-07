@@ -91,3 +91,19 @@ def test_run_history_latest_matching_requires_current_fingerprint_and_schema(tmp
     assert history.latest_matching("ds-1", "analytics", "c" * 64, "2.0.0") is None
     assert history.latest_matching("ds-1", "analytics", "b" * 64, "3.0.0") is None
     assert history.latest_matching("ds-1", "analytics", "b" * 64) is not None
+
+
+def test_run_history_latest_matching_recovers_older_valid_run(tmp_path: Path):
+    history = RunHistory(tmp_path / "history.sqlite3")
+    history.record(
+        "ds-1", "b" * 64, "analytics", "SUCCEEDED",
+        {"schema_version": "2.0.0", "value": "valid"}, "LOCAL",
+    )
+    history.record(
+        "ds-1", "c" * 64, "analytics", "SUCCEEDED",
+        {"schema_version": "2.0.0", "value": "stale"}, "LOCAL",
+    )
+
+    recovered = history.latest_matching("ds-1", "analytics", "b" * 64, "2.0.0")
+    assert recovered is not None
+    assert recovered["value"] == "valid"
