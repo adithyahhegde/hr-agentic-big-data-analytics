@@ -1,7 +1,9 @@
 import csv
 from pathlib import Path
 
-from scripts.benchmark import MAPPINGS, make_fixture, run
+import pytest
+
+from scripts.benchmark import MAPPINGS, SCHEMA_SCENARIOS, make_fixture, run, run_matrix
 
 
 def test_benchmark_fixture_is_reproducible(tmp_path: Path):
@@ -30,3 +32,19 @@ def test_benchmark_run_is_reproducible_at_metadata_level():
     assert first["local"]["rows"] == second["local"]["rows"] == 10
     assert first["local"]["duplicate_rows"] == second["local"]["duplicate_rows"] == 0
     assert "spark" in first
+
+
+def test_benchmark_rejects_invalid_size_and_scenario():
+    with pytest.raises(ValueError, match="positive"):
+        run(rows=0, seed=1)
+    with pytest.raises(ValueError, match="unknown scenario"):
+        run(rows=10, seed=1, scenario="unknown")
+
+
+def test_benchmark_matrix_is_reproducible_and_covers_all_scenarios():
+    result = run_matrix(sizes=(5, 10), seed=7)
+    assert result["seed"] == 7
+    assert result["sizes"] == [5, 10]
+    assert result["scenarios"] == list(SCHEMA_SCENARIOS)
+    assert len(result["results"]) == 2 * len(SCHEMA_SCENARIOS)
+    assert all("task_detection" in item for item in result["results"])
