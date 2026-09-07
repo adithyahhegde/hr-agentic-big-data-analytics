@@ -27,17 +27,32 @@ SCHEMA_SCENARIOS = {
 DEPARTMENTS = ("Engineering", "Sales", "Finance", "HR", "Operations")
 
 
-def make_fixture(path: Path, rows: int, seed: int) -> None:
+def make_fixture(path: Path, rows: int, seed: int, scenario: str = "clean") -> None:
+    if rows < 1:
+        raise ValueError("rows must be positive")
+    if scenario not in SCHEMA_SCENARIOS:
+        raise ValueError(f"unknown scenario: {scenario}")
     rng = random.Random(seed)
     path.parent.mkdir(parents=True, exist_ok=True)
+    mappings = SCHEMA_SCENARIOS[scenario]
+    headers = tuple(mappings)
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
-        writer.writerow(tuple(MAPPINGS))
+        writer.writerow(headers)
         for i in range(1, rows + 1):
             age, salary, performance = rng.randint(21, 60), rng.randint(35000, 180000), rng.randint(1, 5)
             bonus = round(salary * rng.uniform(0.02, 0.18), 2)
             attrition = "Yes" if rng.random() < 0.16 else "No"
-            writer.writerow((i, age, rng.choice(DEPARTMENTS), salary, performance, bonus, attrition))
+            values = {
+                "employee_id": i,
+                "age": age,
+                "department": rng.choice(DEPARTMENTS),
+                "salary": salary,
+                "performance_rating": performance,
+                "bonus": bonus,
+                "attrition": attrition,
+            }
+            writer.writerow(tuple(values[canonical] for canonical in mappings.values()))
 
 
 def summarize(result: dict[str, Any], elapsed: float, size_bytes: int) -> dict[str, Any]:
@@ -52,15 +67,15 @@ def run(rows: int, seed: int, scenario: str = "clean") -> dict[str, Any]:
     mappings = SCHEMA_SCENARIOS[scenario]
     with tempfile.TemporaryDirectory(prefix="hr_benchmark_") as tmp:
         path = Path(tmp) / "benchmark.csv"
-        make_fixture(path, rows, seed)
+        make_fixture(path, rows, seed, scenario)
         size_bytes = path.stat().st_size
-        routed = route_workload(WorkloadProfile(row_count=rows, column_count=len(MAPPINGS), estimated_bytes=size_bytes))
-        start = time.perf_counter(); local = analyze_csv(path, MAPPINGS); local_elapsed = time.perf_counter() - start
+        routed = route_workload(WorkloadProfile(row_count=rows, column_count=len(mappings), estimated_bytes=size_bytes))
+        start = time.perf_counter(); local = analyze_csv(path, mappings); local_elapsed = time.perf_counter() - start
         tasks = detect_tasks(mappings, rows)
         output: dict[str, Any] = {"fixture": {"rows": rows, "seed": seed, "bytes": size_bytes, "scenario": scenario}, "routing": {"selected_engine": routed.value}, "local": summarize(local, local_elapsed, size_bytes), "task_detection": {"feasible": sorted(t.objective for t in tasks if t.status == "FEASIBLE"), "blocked": sorted(t.objective for t in tasks if t.status == "BLOCKED")}}
         try:
             from app.services.spark_analytics import analyze_spark
-            start = time.perf_counter(); spark = analyze_spark(path, MAPPINGS); spark_elapsed = time.perf_counter() - start
+            start = time.perf_counter(); spark = analyze_spark(path, mappings); spark_elapsed = time.perf_counter() - start
         except (ImportError, ModuleNotFoundError) as exc:
             output["spark"] = {"available": False, "reason": type(exc).__name__}
             return output
