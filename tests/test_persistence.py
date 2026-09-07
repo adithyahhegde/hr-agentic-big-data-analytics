@@ -1,3 +1,5 @@
+import json
+import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -65,15 +67,18 @@ def test_dataset_registry_reregister_preserves_profile_and_mappings(tmp_path: Pa
 
 
 def test_run_history_failure_does_not_persist_exception_message(tmp_path: Path):
-    history = RunHistory(tmp_path / "history.sqlite3")
+    db_path = tmp_path / "history.sqlite3"
+    history = RunHistory(db_path)
     secret = "E1,Adithya,50000"
     history.record_failure("ds-1", "b" * 64, "ml", ValueError(secret), "LOCAL")
 
-    latest = history.list("ds-1")[0]
-    assert latest["status"] == "FAILED"
-    assert secret not in str(latest)
-    stored = history.latest("ds-1", "ml")
-    assert stored is None
+    with sqlite3.connect(db_path) as db:
+        result_json = db.execute("SELECT result_json FROM runs WHERE dataset_id=?", ("ds-1",)).fetchone()[0]
+    stored = json.loads(result_json)
+    assert stored["error_type"] == "ValueError"
+    assert stored["message"] != secret
+    assert secret not in result_json
+    assert history.latest("ds-1", "ml") is None
 
 
 def test_run_history_persists_success_and_failure_provenance(tmp_path: Path):
