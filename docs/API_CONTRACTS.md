@@ -58,7 +58,7 @@ The engine excludes identifier-like/constant predictors, uses a reproducible hol
 
 ## Bounded insight synthesis
 
-`GET /api/datasets/{dataset_id}/insights` consumes only verified descriptive analytics and completed ML results. It returns an explicit synthesis plan, evidence list, reversible recommendations, limitations, and a flag showing that unrestricted raw HR records were not accessed by the synthesis layer. Recommendations are decision-support drafts, not automated employment decisions.
+`GET /api/datasets/{dataset_id}/insights` consumes only verified descriptive analytics and completed ML results. The synthesis layer accepts only the four supported analytical objectives, rejects completed runs whose dataset fingerprint conflicts with the current analytics fingerprint, rejects invalid anomaly proportions, bounds the evidence list to 50 items, and truncates long evidence text before returning it. Excluded runs are reported as a limitation rather than silently converted into recommendations. Recommendations remain decision-support drafts, not automated employment decisions.
 
 ## Future tool envelope
 
