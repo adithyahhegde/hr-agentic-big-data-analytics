@@ -165,6 +165,9 @@ def plan_dataset_analyses(dataset_id: str) -> dict[str, object]:
 @app.get("/api/datasets/{dataset_id}/analytics")
 def dataset_analytics(dataset_id: str) -> dict[str, object]:
     profile, mappings, dataset = _require_state(dataset_id)
+    recovered = history.latest_matching(dataset_id, "descriptive_analytics", dataset.sha256, profile.schema_version)
+    if recovered is not None:
+        return recovered
     try:
         workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes); engine = route_workload(workload)
         analytics_result = analyze_spark(dataset.path, mappings) if engine.value == "SPARK" else analyze_csv(dataset.path, mappings)
@@ -182,6 +185,10 @@ def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
     if task.status != "FEASIBLE" or not task.target_field: raise HTTPException(status_code=409, detail="This analytical task is currently blocked by the confirmed schema or dataset size.")
     key = (dataset_id, objective)
     if key in ml_runs: return ml_runs[key]
+    recovered = history.latest_matching(dataset_id, objective, dataset.sha256, profile.schema_version)
+    if recovered is not None:
+        ml_runs[key] = recovered
+        return recovered
     try:
         workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes); engine = route_workload(workload)
         result = run_spark_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields)) if engine.value == "SPARK" else run_heterogeneous_ml(dataset.path, mappings, objective, task.target_field, list(task.feature_fields))
@@ -205,6 +212,10 @@ def run_dataset_automl(dataset_id: str, objective: str) -> dict[str, object]:
         raise HTTPException(status_code=409, detail="This dataset is routed to Spark. Run the routed model comparison instead of local AutoML.")
     key = (dataset_id, f"automl:{objective}")
     if key in ml_runs: return ml_runs[key]
+    recovered = history.latest_matching(dataset_id, f"automl:{objective}", dataset.sha256, profile.schema_version)
+    if recovered is not None:
+        ml_runs[key] = recovered
+        return recovered
     try:
         result = run_automl(dataset.path, mappings, objective, task.target_field, list(task.feature_fields), time_budget=settings.automl_time_budget_seconds)
         result.update({"dataset_id": dataset_id, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, "engine": "LOCAL", "execution_mode": "BOUNDED_AUTOML"})
@@ -222,6 +233,10 @@ def run_dataset_unsupervised(dataset_id: str, objective: str) -> dict[str, objec
     if task.status != "FEASIBLE": raise HTTPException(status_code=409, detail="This analytical task is currently blocked by the confirmed schema or dataset size.")
     key = (dataset_id, objective)
     if key in ml_runs: return ml_runs[key]
+    recovered = history.latest_matching(dataset_id, objective, dataset.sha256, profile.schema_version)
+    if recovered is not None:
+        ml_runs[key] = recovered
+        return recovered
     try:
         workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes); engine = route_workload(workload)
         if engine.value == "SPARK":
@@ -243,9 +258,12 @@ def _report(dataset_id: str) -> dict[str, object]:
     profile, mappings, dataset = _require_state(dataset_id)
     workload = WorkloadProfile(row_count=dataset.row_count, column_count=dataset.column_count, estimated_bytes=dataset.size_bytes)
     engine = route_workload(workload)
-    analytics_result = analyze_spark(dataset.path, mappings) if engine.value == "SPARK" else analyze_csv(dataset.path, mappings)
-    analytics = {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analytics_result}
-    runs = [history.latest(dataset_id, objective) for objective in ("attrition_classification", "salary_regression", "employee_clustering", "anomaly_detection")]
+    analytics = history.latest_matching(dataset_id, "descriptive_analytics", dataset.sha256, profile.schema_version)
+    if analytics is None:
+        analytics_result = analyze_spark(dataset.path, mappings) if engine.value == "SPARK" else analyze_csv(dataset.path, mappings)
+        analytics = {"dataset_id": dataset_id, "engine": engine.value, "dataset_fingerprint": dataset.sha256, "schema_version": profile.schema_version, **analytics_result}
+        history.record(dataset_id, dataset.sha256, "descriptive_analytics", "SUCCEEDED", analytics, engine.value)
+    runs = [history.latest_matching(dataset_id, objective, dataset.sha256, profile.schema_version) for objective in ("attrition_classification", "salary_regression", "employee_clustering", "anomaly_detection", "automl:attrition_classification", "automl:salary_regression")]
     runs = [run for run in runs if run]
     insights = synthesize(analytics, runs)
     return build_report(dataset_id, dataset.sha256, profile.schema_version, analytics, runs, insights)
