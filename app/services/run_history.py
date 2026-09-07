@@ -26,7 +26,24 @@ class RunHistory:
             return int(cursor.lastrowid)
 
     def record_failure(self, dataset_id: str, fingerprint: str, operation: str, error: Exception, engine: str | None = None) -> int:
-        return self.record(dataset_id, fingerprint, operation, "FAILED", {"error_type": type(error).__name__, "message": str(error), "recoverable": isinstance(error, (ValueError, RuntimeError))}, engine)
+        # Exception messages can contain user-provided values (including HR rows).
+        # Persist only the exception class and a bounded, non-content-bearing status.
+        return self.record_failure_safe(dataset_id, fingerprint, operation, type(error).__name__, engine)
+
+    def record_failure_safe(self, dataset_id: str, fingerprint: str, operation: str, error_type: str, engine: str | None = None) -> int:
+        safe_type = str(error_type).split(".")[-1][:100] or "Exception"
+        return self.record(
+            dataset_id,
+            fingerprint,
+            operation,
+            "FAILED",
+            {
+                "error_type": safe_type,
+                "message": "Execution failed; inspect server logs for diagnostic details.",
+                "recoverable": safe_type in {"ValueError", "RuntimeError"},
+            },
+            engine,
+        )
 
     def list(self, dataset_id: str, limit: int = 50) -> list[dict[str, Any]]:
         limit = max(1, min(limit, 200))
