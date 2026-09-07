@@ -12,13 +12,8 @@ def test_dataset_registry_round_trips_manifest_profile_and_mappings(tmp_path: Pa
     csv_path = tmp_path / "dataset.csv"
     csv_path.write_text("employee_id,salary\nE1,50000\n", encoding="utf-8")
     dataset = SimpleNamespace(
-        dataset_id="ds-1",
-        sha256="a" * 64,
-        filename="dataset.csv",
-        path=csv_path,
-        size_bytes=32,
-        row_count=1,
-        column_count=2,
+        dataset_id="ds-1", sha256="a" * 64, filename="dataset.csv", path=csv_path,
+        size_bytes=32, row_count=1, column_count=2,
     )
     registry.register(dataset)
     registry.save_profile("ds-1", SimpleNamespace(model_dump=lambda mode="json": {"dataset_id": "ds-1", "schema_version": "2.0.0"}))
@@ -36,26 +31,16 @@ def test_dataset_registry_reregister_preserves_profile_and_mappings(tmp_path: Pa
     csv_path = tmp_path / "dataset.csv"
     csv_path.write_text("employee_id,salary\nE1,50000\n", encoding="utf-8")
     dataset = SimpleNamespace(
-        dataset_id="ds-1",
-        sha256="a" * 64,
-        filename="dataset.csv",
-        path=csv_path,
-        size_bytes=32,
-        row_count=1,
-        column_count=2,
+        dataset_id="ds-1", sha256="a" * 64, filename="dataset.csv", path=csv_path,
+        size_bytes=32, row_count=1, column_count=2,
     )
     registry.register(dataset)
     registry.save_profile("ds-1", SimpleNamespace(model_dump=lambda mode="json": {"dataset_id": "ds-1", "schema_version": "2.0.0"}))
     registry.save_mappings("ds-1", {"employee_id": "employee_id", "salary": "salary"})
 
     refreshed = SimpleNamespace(
-        dataset_id="ds-1",
-        sha256="c" * 64,
-        filename="renamed.csv",
-        path=tmp_path / "renamed.csv",
-        size_bytes=64,
-        row_count=2,
-        column_count=2,
+        dataset_id="ds-1", sha256="c" * 64, filename="renamed.csv", path=tmp_path / "renamed.csv",
+        size_bytes=64, row_count=2, column_count=2,
     )
     registry.register(refreshed)
 
@@ -93,3 +78,16 @@ def test_run_history_persists_success_and_failure_provenance(tmp_path: Path):
     assert latest["provenance"]["dataset_fingerprint"] == "b" * 64
     runs = history.list("ds-1")
     assert {run["status"] for run in runs} == {"SUCCEEDED", "FAILED"}
+
+
+def test_run_history_latest_matching_requires_current_fingerprint_and_schema(tmp_path: Path):
+    history = RunHistory(tmp_path / "history.sqlite3")
+    history.record(
+        "ds-1", "b" * 64, "analytics", "SUCCEEDED",
+        {"schema_version": "2.0.0", "value": 42}, "LOCAL",
+    )
+
+    assert history.latest_matching("ds-1", "analytics", "b" * 64, "2.0.0")["value"] == 42
+    assert history.latest_matching("ds-1", "analytics", "c" * 64, "2.0.0") is None
+    assert history.latest_matching("ds-1", "analytics", "b" * 64, "3.0.0") is None
+    assert history.latest_matching("ds-1", "analytics", "b" * 64) is not None
