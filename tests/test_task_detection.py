@@ -17,6 +17,31 @@ def test_detects_supported_tasks_from_canonical_schema():
     assert tasks["anomaly_detection"].status == "FEASIBLE"
 
 
+def test_supervised_task_features_are_canonical_fields():
+    mappings = {
+        "Employee ID": "employee_id",
+        "Age": "age",
+        "Department": "department",
+        "Job Role": "job_role",
+        "Annual Salary": "salary",
+        "Overtime": "overtime",
+        "Attrition": "attrition",
+    }
+    tasks = {task.objective: task for task in detect_tasks(mappings, 82)}
+    attrition = tasks["attrition_classification"]
+    assert attrition.status == "FEASIBLE"
+    assert attrition.target_field == "Attrition"
+    assert attrition.feature_fields == ("age", "department", "job_role", "overtime")
+    assert "Age" not in attrition.feature_fields
+
+
+def test_identifiers_and_targets_are_excluded_from_unsupervised_features():
+    mappings = {"Employee ID": "employee_id", "Age": "age", "Attrition": "attrition", "Salary": "salary"}
+    tasks = {task.objective: task for task in detect_tasks(mappings, 20)}
+    assert tasks["employee_clustering"].feature_fields == ("age",)
+    assert tasks["anomaly_detection"].feature_fields == ("age",)
+
+
 def test_does_not_invent_targets():
     mappings = {"age": "age", "income": "monthly_income", "dept": "department"}
     tasks = {task.objective: task for task in detect_tasks(mappings, 100)}
