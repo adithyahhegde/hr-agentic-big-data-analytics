@@ -19,6 +19,7 @@ class TaskCandidate:
 
 
 IDENTIFIER_FIELDS = {"employee_id", "employee_record_id", "manager_id"}
+OUTCOME_FIELDS = {"attrition", "salary"}
 SUPPORTED_ANALYTICAL_FIELDS = {
     "age", "monthly_income", "hourly_rate", "daily_rate", "distance_from_home",
     "education_level", "environment_satisfaction", "job_involvement", "job_level",
@@ -43,12 +44,12 @@ def _fields(mappings: dict[str, str]) -> dict[str, list[str]]:
 
 
 def _usable_features(mappings: dict[str, str], target: str | None = None) -> tuple[str, ...]:
-    """Return confirmed canonical predictor fields in stable input order.
+    """Return confirmed predictors while excluding identifiers and other outcomes.
 
-    The previous implementation excluded ``salary`` and ``attrition`` for every
-    objective, which could silently erase valid predictors and leave the ML
-    execution layer with an empty feature set. Only identifiers, unknown fields,
-    and the current target are excluded here.
+    ``salary`` and ``attrition`` are treated as outcome-like fields. For a
+    supervised objective the active target is excluded and the other outcome is
+    also excluded to reduce leakage between parallel HR outcomes. Unsupervised
+    analyses exclude both outcome-like fields.
     """
     seen: set[str] = set()
     features: list[str] = []
@@ -57,7 +58,11 @@ def _usable_features(mappings: dict[str, str], target: str | None = None) -> tup
             continue
         if canonical not in SUPPORTED_ANALYTICAL_FIELDS:
             continue
-        if canonical in IDENTIFIER_FIELDS or canonical == "unknown" or canonical == target:
+        if canonical in IDENTIFIER_FIELDS or canonical == "unknown":
+            continue
+        if canonical in OUTCOME_FIELDS:
+            continue
+        if canonical == target:
             continue
         seen.add(canonical)
         features.append(canonical)
