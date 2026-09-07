@@ -3,7 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -36,6 +36,38 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 profiles: dict[str, DatasetProfile] = {}
 accepted_mappings: dict[str, dict[str, str]] = {}
 ml_runs: dict[tuple[str, str], dict[str, object]] = {}
+
+
+def _record_api_failure(request: Request, status_code: int, error_type: str) -> None:
+    """Persist execution failures without exposing diagnostic exception details."""
+    if status_code < 422:
+        return
+    parts = request.url.path.strip("/").split("/")
+    if len(parts) < 3 or parts[0] != "api" or parts[1] != "datasets":
+        return
+    dataset_id = parts[2]
+    if dataset_id in {"profile", "execute"}:
+        return
+    try:
+        dataset = store.get(dataset_id)
+        fingerprint = dataset.sha256 if dataset is not None else "unknown"
+        operation = "api:" + "/".join(parts[3:]) if len(parts) > 3 else "api:dataset"
+        history.record_failure_safe(dataset_id, fingerprint, operation, error_type)
+    except Exception:
+        # Failure persistence must never mask the original API response.
+        return
+
+
+@app.exception_handler(HTTPException)
+async def handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
+    _record_api_failure(request, exc.status_code, type(exc).__name__)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(Exception)
+async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONResponse:
+    _record_api_failure(request, 500, type(exc).__name__)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error. Check server logs for operational details."})
 
 
 def _state(dataset_id: str) -> tuple[DatasetProfile | None, dict[str, str] | None]:
@@ -112,7 +144,7 @@ def execute_dataset(file: UploadFile = File(...)) -> dict[str, object]:
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except RuntimeError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
+        raise HTTPException(status_code=503, detail="Execution dependency unavailable.") from error
     except Exception as error:
         raise HTTPException(status_code=500, detail="Dataset execution failed safely. Check the server logs for operational details.") from error
 
@@ -175,7 +207,7 @@ def dataset_analytics(dataset_id: str) -> dict[str, object]:
         history.record(dataset_id, dataset.sha256, "descriptive_analytics", "SUCCEEDED", result, engine.value)
         return result
     except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
-    except RuntimeError as error: raise HTTPException(status_code=503, detail=str(error)) from error
+    except RuntimeError as error: raise HTTPException(status_code=503, detail="Execution dependency unavailable.") from error
 
 @app.post("/api/datasets/{dataset_id}/ml/{objective}")
 def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
@@ -196,7 +228,7 @@ def run_dataset_ml(dataset_id: str, objective: str) -> dict[str, object]:
         history.record(dataset_id, dataset.sha256, objective, "SUCCEEDED", result, engine.value)
         return result
     except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
-    except RuntimeError as error: raise HTTPException(status_code=503, detail=str(error)) from error
+    except RuntimeError as error: raise HTTPException(status_code=503, detail="Execution dependency unavailable.") from error
 
 @app.post("/api/datasets/{dataset_id}/ml/{objective}/automl")
 def run_dataset_automl(dataset_id: str, objective: str) -> dict[str, object]:
@@ -223,7 +255,7 @@ def run_dataset_automl(dataset_id: str, objective: str) -> dict[str, object]:
         history.record(dataset_id, dataset.sha256, f"automl:{objective}", "SUCCEEDED", result, "LOCAL")
         return result
     except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
-    except RuntimeError as error: raise HTTPException(status_code=503, detail=str(error)) from error
+    except RuntimeError as error: raise HTTPException(status_code=503, detail="Execution dependency unavailable.") from error
 
 @app.post("/api/datasets/{dataset_id}/ml/{objective}/unsupervised")
 def run_dataset_unsupervised(dataset_id: str, objective: str) -> dict[str, object]:
@@ -247,7 +279,7 @@ def run_dataset_unsupervised(dataset_id: str, objective: str) -> dict[str, objec
         history.record(dataset_id, dataset.sha256, objective, "SUCCEEDED", result, engine.value)
         return result
     except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
-    except RuntimeError as error: raise HTTPException(status_code=503, detail=str(error)) from error
+    except RuntimeError as error: raise HTTPException(status_code=503, detail="Execution dependency unavailable.") from error
 
 @app.get("/api/datasets/{dataset_id}/runs")
 def dataset_runs(dataset_id: str, limit: int = 50) -> dict[str, object]:
