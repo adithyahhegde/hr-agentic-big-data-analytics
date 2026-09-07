@@ -20,15 +20,16 @@ Evaluate the system as an evidence-led heterogeneous HR analytics pipeline, not 
 | High-cardinality categorical data | bounded categorical summaries |
 | Outlier-heavy numeric data | anomaly-screen behaviour and limitations |
 
-The deterministic fixture generator lives at `scripts/generate_hr_data.py`. The benchmark harness at `scripts/benchmark.py` creates a reproducible canonical fixture and compares local descriptive analytics with Spark when PySpark is available.
+The deterministic fixture generator lives at `scripts/generate_hr_data.py`. The benchmark harness at `scripts/benchmark.py` now supports a reproducible scenario/size matrix as well as a single fixture run.
 
-Example:
+Examples:
 
 ```bash
-python scripts/benchmark.py --rows 100000 --seed 42 --output benchmark.json
+python scripts/benchmark.py --rows 100000 --seed 42 --scenario clean --output benchmark.json
+python scripts/benchmark.py --matrix --seed 42 --output benchmark-matrix.json
 ```
 
-The harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, and aggregate consistency checks. It does not print or persist employee-level records.
+The harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, task-feasibility results, and aggregate consistency checks. It does not print or persist employee-level records. The matrix currently covers clean, renamed, categorical, and mixed schema conditions across configurable row-counts; missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy fixtures remain separate evaluation extensions.
 
 ## Functional metrics
 
@@ -65,4 +66,4 @@ Report both successes and abstentions/failures. A useful evaluation should demon
 
 ## Current evidence status
 
-The benchmark harness and deterministic fixture tests are implemented, but benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
+The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
