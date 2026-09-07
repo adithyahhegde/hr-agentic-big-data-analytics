@@ -6,11 +6,11 @@ A local-first HR analytics workbench for heterogeneous and messy workforce datas
 
 The application provides an end-to-end analytical workflow:
 
-`CSV upload → data health → canonical HR schema review → feasible-task detection → descriptive analytics → model comparison → explainability evidence → bounded insights → provenance/report`
+`CSV upload → data health → canonical HR schema review → feasible-task detection → analytical planning → descriptive analytics → bounded AutoML/model comparison → explainability evidence → bounded insights → provenance/report`
 
-The system automatically profiles uploaded data, evaluates data-quality rules, proposes canonical HR schema mappings with confidence/evidence, blocks unresolved mapping collisions, lets the user confirm mappings, detects feasible analytical objectives, routes workloads between local and Spark execution policies, computes descriptive analytics, and compares multiple supervised ML candidates for feasible classification/regression tasks. It also supports local clustering/anomaly detection and routed Spark execution for supervised ML, clustering, and distributed anomaly screening.
+The system automatically profiles uploaded data, evaluates data-quality rules, proposes canonical HR schema mappings with confidence/evidence, blocks unresolved mapping collisions, lets the user confirm mappings, detects feasible analytical objectives, uses a bounded planning agent to rank validated investigations, routes workloads between local and Spark execution policies, computes descriptive analytics, and supports supervised model comparison plus optional bounded AutoML for local classification/regression tasks. It also supports local clustering/anomaly detection and routed Spark execution for supervised ML, clustering, and distributed anomaly screening.
 
-ML execution is deliberately bounded and deterministic: only confirmed targets are used; identifier-like and constant predictors are excluded; reproducible evaluation is used; task-appropriate metrics are reported; and explainability evidence is surfaced with explicit limitations. The system does not make automated employment decisions.
+ML execution is deliberately bounded: only confirmed targets are used; identifier-like and constant predictors are excluded; reproducible evaluation is used; task-appropriate metrics are reported; categorical preprocessing is bounded; and explainability evidence is surfaced with explicit limitations. The AutoML path uses the optional FLAML extra with an explicit time budget and a constrained learner set. The system does not make automated employment decisions.
 
 The agentic layer is a constrained evidence synthesizer rather than an unrestricted data-science chatbot. It consumes structured analytical outputs, generates conservative investigation actions, records provenance, and never receives unrestricted raw HR records. The optional local LLM is not required for the core workflow.
 
@@ -34,6 +34,7 @@ Open `http://127.0.0.1:8000`.
 
 - Base install: upload, profiling, schema, routing and deterministic analytics foundation.
 - `ml` extra: local heterogeneous supervised/unsupervised ML.
+- `automl` extra: bounded FLAML model/feature preprocessing search for local supervised objectives; configure `HR_ANALYTICS_AUTOML_TIME_BUDGET_SECONDS` from 1–600 seconds.
 - `bigdata` extra: PySpark-backed large-data analytics and Spark ML.
 - `dev` extra: test tooling.
 
@@ -43,9 +44,9 @@ The benchmark harness can compare local and Spark descriptive execution when PyS
 
 ## Research/evaluation status
 
-The project deliberately makes **no broad novelty or "first" claim**. Existing agentic data-science, enterprise analytics, workforce analytics and HR decision-support systems overlap with the broad concept. The research direction is narrower: evaluate whether confidence-aware HR schema interpretation, objective-feasibility gates, evidence-bounded planning/synthesis, scalable routing, and provenance improve reliability on heterogeneous HR datasets.
+The project deliberately makes **no broad novelty or "first" claim**. Existing agentic data-science, enterprise analytics, workforce analytics and HR decision-support systems overlap with the broad concept. The research direction is narrower: evaluate whether confidence-aware HR schema interpretation, objective-feasibility gates, bounded evidence-led planning/synthesis, automated model search, scalable routing, and provenance improve reliability on heterogeneous HR datasets.
 
-The repository includes deterministic benchmark generation plus regression tests for routing, data quality, schema interpretation, persistence/provenance, bounded synthesis, report privacy, and benchmark behavior. CI installs the lightweight `dev,ml` environment; Spark remains an optional dependency and is handled explicitly by the benchmark harness.
+The repository includes deterministic benchmark generation plus regression tests for routing, data quality, schema interpretation, persistence/provenance, bounded synthesis, report privacy, bounded AutoML guardrails, and benchmark behavior. CI installs the lightweight `dev,ml,automl` environment; Spark remains an optional dependency and is handled explicitly by the benchmark harness.
 
 Formal comparative robustness/scalability results should only be reported after the benchmark protocol has been executed and recorded. Do not infer research performance from unit-test counts.
 
@@ -56,6 +57,7 @@ This is a research-grade implementation foundation, not a validated production H
 - Spark uses local distributed execution unless deployed against an external Spark cluster.
 - Distributed anomaly detection is a scalable z-score screening method, not an exact distributed equivalent of every local detector.
 - Spark explainability is currently more limited than local feature-importance/permutation evidence.
+- The current AutoML implementation is intentionally bounded to local supervised objectives; Spark AutoML and unsupervised AutoML remain separate engineering tracks.
 - Statistical/predictive evidence is associative and does not establish causality.
 - Recommendations require human review and must not be used as automated hiring, firing, promotion, or compensation decisions.
 - The current workflow is primarily CSV-based and single-application/local-storage oriented.
