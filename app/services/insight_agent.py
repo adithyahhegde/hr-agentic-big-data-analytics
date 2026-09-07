@@ -25,8 +25,15 @@ def synthesize(analytics: dict[str, Any], ml_runs: list[dict[str, Any]]) -> dict
             evidence.append({"source": "anomaly_detection", "type": "ANOMALY", "severity": "INFO", "title": f"{share * 100:.1f}% of usable rows flagged for review", "evidence": f"{result.get('method', 'Anomaly detection')} identified multivariate outlier patterns across confirmed predictors; usable rows: {result.get('rows_used', 0):,}."})
             actions.append({"priority": "MEDIUM", "action": "Review the aggregate anomaly pattern for data-quality, process, or population-shift explanations before interpreting it as a workforce signal.", "basis": f"{share * 100:.1f}% of usable rows were flagged by the unsupervised detector.", "constraint": "Anomaly status is a statistical review signal and is not evidence of misconduct, poor performance, or individual risk."})
             continue
+
         selected = result.get("selected_model", "model")
         metric = result.get("selection_metric", "evaluation metric")
+        if result.get("execution_mode") == "BOUNDED_AUTOML":
+            estimators = ", ".join(result.get("search", {}).get("estimators", []))
+            evidence.append({"source": "automl_search", "type": "PREDICTIVE", "severity": "INFO", "title": f"{selected.replace('_', ' ')} selected by bounded AutoML", "evidence": f"FLAML searched the configured learner set ({estimators}) within a {result.get('search', {}).get('time_budget_seconds', 'bounded')} second budget and evaluated the selected model on {result.get('test_rows', 0):,} held-out rows using {metric}."})
+            actions.append({"priority": "MEDIUM", "action": "Use the selected model as a predictive investigation aid, inspect its validation metrics and stability, and confirm the underlying business question with domain owners before acting.", "basis": f"Bounded AutoML selected {selected.replace('_', ' ')} using held-out {metric} evidence.", "constraint": "Automated model selection does not establish causality or justify an individual employment decision."})
+            continue
+
         evidence.append({"source": "model_evaluation", "type": "PREDICTIVE", "severity": "INFO", "title": f"{selected.replace('_', ' ')} selected", "evidence": f"Selected from {len(result.get('models', []))} candidates using held-out {metric} evidence; test rows: {result.get('test_rows', 0):,}."})
         top = (result.get("explainability") or {}).get("top_features", [])
         if top:
@@ -41,5 +48,6 @@ def synthesize(analytics: dict[str, Any], ml_runs: list[dict[str, Any]]) -> dict
         "Recommendations require human review and should not be used as automated hiring, firing, promotion, or compensation decisions.",
         "Categorical predictors are encoded for local supervised modelling; encoded feature importance may refer to individual category levels rather than the original business field.",
         "Unsupervised clustering and anomaly detection identify statistical patterns that require domain validation and may be sensitive to feature selection and scaling.",
+        "Bounded AutoML searches only the configured learner set and time budget; it is not a guarantee of a globally optimal model.",
     ]
     return {"agent": "bounded_evidence_synthesizer_v2", "plan": ["collect verified findings", "classify evidence by analytical source", "rank material signals", "draft reversible investigation actions", "attach limitations"], "evidence": evidence, "recommendations": actions, "limitations": limitations, "raw_hr_records_accessed": False}
