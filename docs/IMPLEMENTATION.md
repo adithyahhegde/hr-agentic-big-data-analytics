@@ -12,10 +12,11 @@
 - [x] Basic health checks.
 
 ## Phase 2 — Data ingestion and profiling
-- [x] CSV upload (request-scoped analysis state).
-- [x] File validation.
+- [x] CSV upload and reusable dataset storage.
+- [x] File validation and bounded profiling.
 - [x] Deterministic dataset profiling.
 - [x] Data-quality report.
+- [x] Persistent profile state.
 
 ## Phase 3 — Semantic schema layer
 - [x] Canonical HR schema.
@@ -23,6 +24,7 @@
 - [x] Confidence scoring.
 - [x] Collision/ambiguity blocking at schema acceptance.
 - [x] Optional local LLM fallback.
+- [x] Persistent confirmed mappings.
 
 ## Phase 4 — Big Data engine
 - [x] Spark integration (optional runtime dependency).
@@ -31,8 +33,10 @@
 - [x] Scalable grouped transformations.
 - [x] API-level workload routing contract.
 - [x] Streamed dataset execution boundary.
-- [ ] Production/durable dataset persistence and lifecycle.
-- [ ] Scalability benchmark validation.
+- [x] Durable local dataset persistence and manifest registry.
+- [x] Scalable descriptive analytics path.
+- [x] Distributed anomaly screening path.
+- [ ] External-cluster scalability validation.
 
 ## Phase 5 — Analytics/ML engine
 - [x] Deterministic task detection.
@@ -45,7 +49,7 @@
 - [x] Native Spark ML path for routed supervised classification/regression.
 - [x] Distributed Spark K-Means path for routed clustering workloads.
 - [x] Heterogeneous local supervised feature preparation with numeric imputation and categorical one-hot encoding.
-- [ ] Distributed anomaly detection equivalent.
+- [x] Distributed anomaly screening with explicit method disclosure.
 
 ## Phase 6 — Explainability
 - [x] Structured feature-importance/permutation evidence for supported local supervised models.
@@ -59,9 +63,10 @@
 - [x] Tool/interface contracts documented.
 - [x] Bounded evidence-to-action synthesis service.
 - [x] Separate synthesis handling for predictive, segmentation, and anomaly evidence.
+- [x] Structured provenance attached to analytical run records.
 - [ ] Multi-step planning/execution state.
-- [ ] Retry/recovery.
-- [ ] Human confirmation points for agentic actions.
+- [ ] Retry/recovery orchestration beyond bounded service-level handling.
+- [ ] Human confirmation points for consequential agentic actions.
 
 ## Phase 8 — Decision support
 - [x] Deterministic evidence cards.
@@ -77,20 +82,25 @@
 - [x] Model comparison and explanation presentation.
 - [x] SQLite-backed analytical run history.
 - [x] JSON and standalone HTML report exports.
-- [ ] Durable dataset persistence and multi-user lifecycle.
+- [x] Dataset list/manifest APIs.
+- [x] Restart-recoverable dataset/profile/schema state when local data storage persists.
+- [ ] Multi-user lifecycle and access control.
 
 ## Phase 10 — Evaluation
-- [ ] Functional tests for the new end-to-end workflow.
-- [ ] Schema-mapping tests.
-- [ ] Model-selection tests.
-- [ ] Scalability benchmarks.
-- [ ] Robustness tests.
-- [ ] Documentation consistency check.
+- [x] Benchmark fixture generator.
+- [x] Benchmark harness with local/Spark optional comparison and consistency checks.
+- [x] Regression tests for routing, profiling, data quality, persistence, provenance, bounded synthesis, reports, and benchmark behavior.
+- [ ] Full robustness matrix across clean/messy/ambiguous/categorical/mixed datasets.
+- [ ] Scalability measurements at multiple dataset sizes.
+- [ ] Comparative schema-mapping evaluation against baseline methods.
+- [ ] Objective-feasibility evaluation.
+- [ ] End-to-end agent reliability/abstention evaluation.
+- [ ] Documentation consistency audit after final feature freeze.
 
 ## Definition of done
-A phase is complete only when implementation, tests, documentation, and known limitations agree. New functionality is therefore intentionally marked as implemented but not yet formally validated until the dedicated testing pass.
+A phase is complete only when implementation, tests, documentation, and known limitations agree. New functionality is intentionally marked as implemented but not as empirically validated until the dedicated evaluation protocol has been executed.
 
 ## Current status
-The product now spans upload, deterministic data health, canonical schema confirmation, heterogeneous task detection, descriptive analytics, bounded supervised ML comparison with mixed numeric/categorical predictors, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering, basic explainability, provenance, persistent run history, reproducible JSON/HTML reporting, and bounded evidence-to-action synthesis in one workflow. The routing layer decides between local and Spark execution from workload characteristics; it is an engineering execution policy rather than a universal definition of Big Data. The agentic layer consumes structured analytical outputs rather than unrestricted HR records and does not make employment decisions.
+The product now spans upload, deterministic data health, canonical schema confirmation, heterogeneous task detection, descriptive analytics, bounded supervised ML comparison with mixed numeric/categorical predictors, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering/anomaly screening, explainability evidence, persistent dataset/profile/schema state, persistent run history, reproducible JSON/HTML reporting, and bounded evidence-to-action synthesis in one workflow.
 
-The remaining major product gaps are distributed anomaly detection, SHAP/persistent explanation artifacts, durable dataset lifecycle, richer agent execution state, evidence-object-level recommendation citations, and then the dedicated robustness/benchmark test pass. No new ML test results are claimed in this document yet.
+The remaining research-critical work is primarily **evaluation rather than adding unchecked features**: execute the robustness/scalability protocol, quantify schema-mapping and feasibility reliability, test abstention/failure behavior, and document the observed trade-offs. The broad product concept is not claimed as novel; the proposed contribution must be supported by measured results.
