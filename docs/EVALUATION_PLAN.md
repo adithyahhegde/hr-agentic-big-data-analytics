@@ -20,6 +20,16 @@ Evaluate the system as an evidence-led heterogeneous HR analytics pipeline, not 
 | High-cardinality categorical data | bounded categorical summaries |
 | Outlier-heavy numeric data | anomaly-screen behaviour and limitations |
 
+The deterministic fixture generator lives at `scripts/generate_hr_data.py`. The benchmark harness at `scripts/benchmark.py` creates a reproducible canonical fixture and compares local descriptive analytics with Spark when PySpark is available.
+
+Example:
+
+```bash
+python scripts/benchmark.py --rows 100000 --seed 42 --output benchmark.json
+```
+
+The harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, and aggregate consistency checks. It does not print or persist employee-level records.
+
 ## Functional metrics
 
 - schema mapping precision/recall against a labelled mapping fixture
@@ -52,3 +62,7 @@ Every benchmark run should record the dataset fingerprint, schema version, engin
 ## Academic reporting
 
 Report both successes and abstentions/failures. A useful evaluation should demonstrate that the system avoids unsafe conclusions when mappings, data quality, sample size, or analytical assumptions are insufficient.
+
+## Current evidence status
+
+The benchmark harness and deterministic fixture tests are implemented, but benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
