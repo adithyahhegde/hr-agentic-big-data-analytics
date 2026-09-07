@@ -57,11 +57,26 @@ class RunHistory:
             return None
 
     def latest_matching(self, dataset_id: str, operation: str, fingerprint: str, schema_version: str | None = None) -> dict[str, Any] | None:
-        result = self.latest(dataset_id, operation)
-        if result is None:
+        """Return the newest successful run that matches the current dataset identity."""
+        query = "SELECT * FROM runs WHERE dataset_id=? AND operation=? AND fingerprint=? AND status='SUCCEEDED'"
+        params: list[Any] = [dataset_id, operation, fingerprint]
+        if schema_version is not None:
+            query += " AND json_extract(result_json, '$.schema_version')=?"
+            params.append(schema_version)
+        query += " ORDER BY id DESC LIMIT 1"
+        with sqlite3.connect(self.path) as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute(query, params).fetchone()
+        if not row:
             return None
-        provenance = result.get("provenance", {}) if isinstance(result, dict) else {}
-        if provenance.get("dataset_fingerprint") != fingerprint:
+        try:
+            result = json.loads(row["result_json"])
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(result, dict):
+            return None
+        provenance = result.get("provenance", {})
+        if not isinstance(provenance, dict) or provenance.get("dataset_fingerprint") != fingerprint:
             return None
         if schema_version is not None and result.get("schema_version") != schema_version:
             return None
