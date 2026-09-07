@@ -1,0 +1,64 @@
+name: Evaluation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'docs/EVALUATION_PLAN.md'
+      - '.github/workflows/evaluation.yml'
+
+concurrency:
+  group: evaluation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reproducible-evaluation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install evaluation dependencies
+        run: python -m pip install --upgrade pip && pip install -e '.[dev,ml]'
+      - name: Run objective-feasibility evaluation
+        run: python scripts/feasibility_evaluation.py --sizes 10 20 100 --seed 42 --output artifacts/feasibility.json
+      - name: Run robustness benchmark matrix
+        run: python scripts/benchmark.py --matrix --output artifacts/benchmark.json
+      - name: Validate evaluation artifacts
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          feasibility = json.loads(Path('artifacts/feasibility.json').read_text())
+          benchmark = json.loads(Path('artifacts/benchmark.json').read_text())
+
+          assert feasibility['seed'] == 42
+          assert feasibility['sizes'] == [10, 20, 100]
+          assert feasibility['accuracy']['pipeline'] == 1.0
+          assert len(feasibility['records']) == 18
+
+          assert benchmark['seed'] == 42
+          assert benchmark['sizes'] == [100, 1000, 10000]
+          assert benchmark['scenarios'] == ['clean', 'messy', 'categorical', 'mixed', 'ambiguous', 'leakage_prone']
+          assert len(benchmark['results']) == 18
+          for result in benchmark['results']:
+              scenario = result['fixture']['scenario']
+              expected_gate = 'BLOCKED_COLLISION' if scenario in {'ambiguous', 'leakage_prone'} else 'ACCEPTABLE'
+              assert result['schema_gate'] == expected_gate
+              if expected_gate == 'BLOCKED_COLLISION':
+                  assert result['local']['skipped'] is True
+          PY
+      - name: Upload reproducible evaluation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hr-analytics-evaluation-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
