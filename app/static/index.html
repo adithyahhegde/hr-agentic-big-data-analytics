@@ -27,7 +27,7 @@
     <div class="mobile-progress" aria-label="Workflow progress"><span class="progress-line"></span><span class="progress-fill" id="progress-fill"></span><b>01</b><b>02</b><b>03</b><b>04</b><b>05</b></div>
 
     <section id="step-1" class="step-panel active-panel">
-      <div class="hero"><div><div class="section-kicker">01 / Dataset intake</div><h2>Start with your HR data.</h2><p>The platform profiles messy CSV data, evaluates quality, maps source fields to a canonical HR schema, detects feasible analyses, and produces evidence-backed findings.</p></div></div>
+      <div class="hero"><div><div class="section-kicker">01 / Dataset intake</div><h2>Start with your HR data.</h2><p>The platform profiles messy CSV data, evaluates quality, maps source fields to a canonical HR schema, discovers feasible analyses, and produces evidence-backed findings.</p></div></div>
       <form id="upload-form" class="dropzone">
         <div class="upload-icon">↑</div><h3>Drop a CSV dataset here</h3><p>or choose a file from your device</p>
         <input id="dataset" name="file" type="file" accept=".csv,text/csv" required>
@@ -47,15 +47,16 @@
     </section>
 
     <section id="step-3" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">03 / Schema understanding</div><h2>Review how the platform understands your columns.</h2><p id="mapping-summary"></p></div><button class="secondary" data-back="2">← Back</button></div>
-      <div class="notice"><strong>Review before execution</strong><span>Automatic mappings use multiple evidence signals. Ambiguous fields remain reviewable. Choose <b>Unknown</b> rather than forcing a semantic guess.</span></div>
-      <div class="panel table-panel"><table><thead><tr><th>Source field</th><th>Type</th><th>Missing</th><th>Suggested field</th><th>Confidence</th><th>Evidence</th></tr></thead><tbody id="mapping-rows"></tbody></table></div>
-      <div class="step-actions"><button id="confirm-schema" class="primary">Confirm schema & detect analyses <span>→</span></button></div>
+      <div class="section-head"><div><div class="section-kicker">03 / Schema understanding</div><h2>The platform understood your data.</h2><p id="mapping-summary"></p></div><button class="secondary" data-back="2">← Back</button></div>
+      <div class="notice"><strong>Schema confirmed automatically</strong><span>High-confidence mappings are accepted by default. Detailed mapping evidence stays available when you want to inspect or change a field.</span></div>
+      <details class="panel schema-details"><summary><strong>Review or change column understanding</strong><span>Open advanced schema controls</span></summary><div class="table-panel"><table><thead><tr><th>Source field</th><th>Type</th><th>Missing</th><th>Suggested field</th><th>Confidence</th><th>Evidence</th></tr></thead><tbody id="mapping-rows"></tbody></table></div></details>
+      <div class="step-actions"><button id="confirm-schema" class="primary">Use this understanding & ask the agent <span>→</span></button></div>
       <div id="schema-status" class="status" role="status" aria-live="polite"></div>
     </section>
 
     <section id="step-4" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">04 / Analysis workspace</div><h2>What can this dataset support?</h2><p>Tasks are proposed only when the confirmed schema and dataset size provide sufficient evidence.</p></div><button class="secondary" data-back="3">← Back</button></div>
+      <div class="section-head"><div><div class="section-kicker">04 / Analysis workspace</div><h2>What should we investigate?</h2><p>The planning agent reasons over validated capabilities; deterministic gates prevent unsupported analyses.</p></div><button class="secondary" data-back="3">← Back</button></div>
+      <div id="agent-plan" class="agent-plan panel"><div class="agent-plan-loading"><span class="spinner"></span> The planning agent is assessing analytical opportunities…</div></div>
       <div id="task-grid" class="task-grid"></div>
       <div class="panel"><div class="panel-head"><h3>Deterministic descriptive analytics</h3><span id="engine-badge" class="engine-badge"></span></div><div id="analysis-metrics" class="metric-grid compact"></div></div>
       <div class="panel"><div class="panel-head"><h3>Numeric fields</h3><span class="table-caption">Confirmed canonical fields</span></div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Count</th><th>Minimum</th><th>Mean</th><th>Maximum</th></tr></thead><tbody id="numeric-rows"></tbody></table></div></div>
@@ -75,5 +76,6 @@
   </main>
 </div>
 <script src="/static/app.js"></script>
+<script src="/static/planner.js"></script>
 </body>
 </html>
