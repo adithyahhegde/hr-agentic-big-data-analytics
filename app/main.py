@@ -18,6 +18,7 @@ from app.services.dataset_store import store
 from app.services.heterogeneous_ml import run_heterogeneous_ml
 from app.services.insight_agent import synthesize
 from app.services.ml_engine import run_anomaly_detection, run_clustering
+from app.services.planning_agent import plan_analyses
 from app.services.profiling import canonical_fields, profile_dataset
 from app.services.report_export import build_report, to_html
 from app.services.run_history import history
@@ -150,6 +151,14 @@ def detect_dataset_tasks(dataset_id: str) -> TaskDetectionResponse:
         raise HTTPException(status_code=409, detail="Confirm the dataset schema before detecting analytical tasks.")
     tasks = detect_tasks(mappings, profile.row_count)
     return TaskDetectionResponse(dataset_id=dataset_id, row_count=profile.row_count, tasks=[TaskCandidateResponse(objective=t.objective, status=t.status, target_field=t.target_field, feature_fields=list(t.feature_fields), reasons=list(t.reasons)) for t in tasks])
+
+@app.get("/api/datasets/{dataset_id}/plan")
+def plan_dataset_analyses(dataset_id: str) -> dict[str, object]:
+    profile, mappings = _state(dataset_id)
+    if profile is None or mappings is None:
+        raise HTTPException(status_code=409, detail="Confirm the dataset schema before asking the planning agent.")
+    tasks = detect_tasks(mappings, profile.row_count)
+    return plan_analyses(tasks, settings)
 
 @app.get("/api/datasets/{dataset_id}/analytics")
 def dataset_analytics(dataset_id: str) -> dict[str, object]:
