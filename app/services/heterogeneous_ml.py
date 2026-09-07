@@ -14,6 +14,13 @@ def _label(value: str) -> int | None:
     return None
 
 
+def _safe_model_failure(error: Exception) -> dict[str, str]:
+    """Return a stable, non-sensitive model failure classification."""
+    error_type = type(error).__name__.split(".")[-1][:80] or "Exception"
+    recoverable = error_type in {"ValueError", "TypeError", "MemoryError", "RuntimeError"}
+    return {"status": "FAILED", "error_type": error_type, "reason": "Candidate model failed during fitting or evaluation.", "recoverable": str(recoverable).lower()}
+
+
 def run_heterogeneous_ml(path: Path, mappings: dict[str, str], objective: str, target: str, features: list[str], seed: int = 42) -> dict[str, Any]:
     """Train comparable local models while preserving categorical predictors."""
     try:
@@ -58,7 +65,6 @@ def run_heterogeneous_ml(path: Path, mappings: dict[str, str], objective: str, t
         X[column] = X[column].astype("string")
 
     numeric_pipe = Pipeline([("imputer", SimpleImputer(strategy="median")), ("scale", StandardScaler())])
-    # Bound categorical dimensionality so a high-cardinality HR field cannot create an unbounded feature matrix.
     categorical_pipe = Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("onehot", OneHotEncoder(handle_unknown="ignore", min_frequency=2, max_categories=100))])
     preprocessor = ColumnTransformer([("numeric", numeric_pipe, numeric), ("categorical", categorical_pipe, categorical)], remainder="drop")
     try:
@@ -67,17 +73,9 @@ def run_heterogeneous_ml(path: Path, mappings: dict[str, str], objective: str, t
         raise ValueError(f"The dataset cannot support a reliable holdout split: {exc}") from exc
 
     if classification:
-        models = {
-            "logistic_regression": LogisticRegression(max_iter=1000, class_weight="balanced", random_state=seed),
-            "random_forest": RandomForestClassifier(n_estimators=150, max_depth=8, min_samples_leaf=3, class_weight="balanced", random_state=seed, n_jobs=-1),
-            "hist_gradient_boosting": HistGradientBoostingClassifier(max_iter=120, max_leaf_nodes=15, random_state=seed),
-        }
+        models = {"logistic_regression": LogisticRegression(max_iter=1000, class_weight="balanced", random_state=seed), "random_forest": RandomForestClassifier(n_estimators=150, max_depth=8, min_samples_leaf=3, class_weight="balanced", random_state=seed, n_jobs=-1), "hist_gradient_boosting": HistGradientBoostingClassifier(max_iter=120, max_leaf_nodes=15, random_state=seed)}
     else:
-        models = {
-            "ridge_regression": Ridge(alpha=1.0),
-            "random_forest": RandomForestRegressor(n_estimators=150, max_depth=8, min_samples_leaf=3, random_state=seed, n_jobs=-1),
-            "hist_gradient_boosting": HistGradientBoostingRegressor(max_iter=120, max_leaf_nodes=15, random_state=seed),
-        }
+        models = {"ridge_regression": Ridge(alpha=1.0), "random_forest": RandomForestRegressor(n_estimators=150, max_depth=8, min_samples_leaf=3, random_state=seed, n_jobs=-1), "hist_gradient_boosting": HistGradientBoostingRegressor(max_iter=120, max_leaf_nodes=15, random_state=seed)}
 
     results: list[dict[str, Any]] = []
     fitted: dict[str, Any] = {}
@@ -104,7 +102,7 @@ def run_heterogeneous_ml(path: Path, mappings: dict[str, str], objective: str, t
             fitted[name] = pipeline
             results.append({"model": name, "metrics": metrics, "selection_score": round(score, 6)})
         except Exception as exc:
-            results.append({"model": name, "metrics": {}, "selection_score": float("-inf"), "status": "FAILED", "reason": str(exc)})
+            results.append({"model": name, "metrics": {}, "selection_score": float("-inf"), **_safe_model_failure(exc)})
 
     valid = [r for r in results if r.get("metrics")]
     if not valid:
@@ -122,13 +120,4 @@ def run_heterogeneous_ml(path: Path, mappings: dict[str, str], objective: str, t
         pairs = sorted(zip(transformed, values), key=lambda x: float(x[1]), reverse=True)[:15]
         top_features = [{"feature": str(name), "importance": round(float(value), 6)} for name, value in pairs]
 
-    return {
-        "objective": objective, "target_field": target, "feature_fields": selected,
-        "numeric_features": numeric, "categorical_features": categorical,
-        "rows_used": int(len(X)), "train_rows": int(len(X_train)), "test_rows": int(len(X_test)),
-        "models": results, "selected_model": best["model"],
-        "selection_metric": "f1" if classification else "rmse",
-        "explainability": {"method": "encoded_model_importance", "top_features": top_features},
-        "preparation": {"numeric_imputation": "median", "categorical_imputation": "most_frequent", "categorical_encoding": "one_hot", "unknown_category_policy": "ignore", "max_categories_per_field": 100},
-        "safeguards": ["confirmed target only", "identifier exclusion", "bounded categorical encoding", "reproducible holdout seed", "no external model API", "no raw records returned"],
-    }
+    return {"objective": objective, "target_field": target, "feature_fields": selected, "numeric_features": numeric, "categorical_features": categorical, "rows_used": int(len(X)), "train_rows": int(len(X_train)), "test_rows": int(len(X_test)), "models": results, "selected_model": best["model"], "selection_metric": "f1" if classification else "rmse", "explainability": {"method": "encoded_model_importance", "top_features": top_features}, "preparation": {"numeric_imputation": "median", "categorical_imputation": "most_frequent", "categorical_encoding": "one_hot", "unknown_category_policy": "ignore", "max_categories_per_field": 100}, "safeguards": ["confirmed target only", "identifier exclusion", "bounded categorical encoding", "reproducible holdout seed", "no external model API", "no raw records returned", "candidate failures are sanitized"]}
