@@ -86,12 +86,12 @@ def run(rows: int, seed: int) -> dict[str, Any]:
 
         try:
             from app.services.spark_analytics import analyze_spark
-        except Exception as exc:  # optional dependency
+            start = time.perf_counter()
+            spark = analyze_spark(path, MAPPINGS)
+        except (ImportError, ModuleNotFoundError) as exc:
             output["spark"] = {"available": False, "reason": type(exc).__name__}
             return output
 
-        start = time.perf_counter()
-        spark = analyze_spark(path, MAPPINGS)
         spark_elapsed = time.perf_counter() - start
         output["spark"] = {"available": True, **summarize(spark, spark_elapsed, size_bytes)}
         output["consistency"] = {
