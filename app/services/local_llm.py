@@ -59,7 +59,9 @@ def resolve_ambiguous_mapping(*, source_name: str, inferred_type: str, uniquenes
     prompt = json.dumps({"source_column": source_name, "inferred_type": inferred_type, "uniqueness_ratio": round(uniqueness_ratio, 4), "sample_values": sample_values[:5], "candidate_canonical_fields": candidates, "required_response": {"canonical_field": "one candidate exactly", "reason": "short evidence-based explanation", "confidence_band": "low | medium | high"}}, ensure_ascii=False)
     result = _request_ollama(base_url=base_url, model=model, prompt=prompt, timeout_seconds=timeout_seconds)
     canonical, reason, confidence_band = result.get("canonical_field"), result.get("reason"), result.get("confidence_band")
-    if canonical not in candidates or not isinstance(reason, str) or not reason.strip() or confidence_band not in {"low", "medium", "high"}:
+    if canonical not in candidates:
+        raise LocalLLMError("Local LLM returned a field outside the candidate set.")
+    if not isinstance(reason, str) or not reason.strip() or confidence_band not in {"low", "medium", "high"}:
         raise LocalLLMError("Local LLM returned an invalid schema decision.")
     return LLMDecision(canonical_field=canonical, reason=reason.strip()[:500], confidence_band=confidence_band)
 
