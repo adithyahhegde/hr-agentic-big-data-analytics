@@ -57,30 +57,33 @@ class RunHistory:
             return None
 
     def latest_matching(self, dataset_id: str, operation: str, fingerprint: str, schema_version: str | None = None) -> dict[str, Any] | None:
-        """Return the newest successful run that matches the current dataset identity."""
-        query = "SELECT * FROM runs WHERE dataset_id=? AND operation=? AND fingerprint=? AND status='SUCCEEDED'"
+        """Return the newest valid successful run for a dataset fingerprint.
+
+        Avoid SQLite JSON-extension functions so the recovery path works with
+        minimal SQLite builds. Schema matching is validated after decoding the
+        bounded result payload, while fingerprint matching remains indexed by
+        the ledger's ordinary TEXT column.
+        """
+        query = "SELECT * FROM runs WHERE dataset_id=? AND operation=? AND fingerprint=? AND status='SUCCEEDED' ORDER BY id DESC"
         params: list[Any] = [dataset_id, operation, fingerprint]
-        if schema_version is not None:
-            query += " AND json_extract(result_json, '$.schema_version')=?"
-            params.append(schema_version)
-        query += " ORDER BY id DESC LIMIT 1"
         with sqlite3.connect(self.path) as db:
             db.row_factory = sqlite3.Row
-            row = db.execute(query, params).fetchone()
-        if not row:
-            return None
-        try:
-            result = json.loads(row["result_json"])
-        except (TypeError, json.JSONDecodeError):
-            return None
-        if not isinstance(result, dict):
-            return None
-        provenance = result.get("provenance", {})
-        if not isinstance(provenance, dict) or provenance.get("dataset_fingerprint") != fingerprint:
-            return None
-        if schema_version is not None and result.get("schema_version") != schema_version:
-            return None
-        return result
+            rows = db.execute(query, params).fetchall()
+
+        for row in rows:
+            try:
+                result = json.loads(row["result_json"])
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if not isinstance(result, dict):
+                continue
+            provenance = result.get("provenance", {})
+            if not isinstance(provenance, dict) or provenance.get("dataset_fingerprint") != fingerprint:
+                continue
+            if schema_version is not None and result.get("schema_version") != schema_version:
+                continue
+            return result
+        return None
 
 
 history = RunHistory()
