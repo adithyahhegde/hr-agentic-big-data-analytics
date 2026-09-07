@@ -107,3 +107,29 @@ def test_run_history_latest_matching_recovers_older_valid_run(tmp_path: Path):
     recovered = history.latest_matching("ds-1", "analytics", "b" * 64, "2.0.0")
     assert recovered is not None
     assert recovered["value"] == "valid"
+
+
+def test_run_history_latest_matching_skips_newer_schema_mismatch(tmp_path: Path):
+    history = RunHistory(tmp_path / "history.sqlite3")
+    history.record("ds-1", "b" * 64, "analytics", "SUCCEEDED", {"schema_version": "2.0.0", "value": "older-valid"}, "LOCAL")
+    history.record("ds-1", "b" * 64, "analytics", "SUCCEEDED", {"schema_version": "3.0.0", "value": "newer-incompatible"}, "LOCAL")
+
+    recovered = history.latest_matching("ds-1", "analytics", "b" * 64, "2.0.0")
+    assert recovered is not None
+    assert recovered["value"] == "older-valid"
+
+
+def test_run_history_latest_matching_ignores_corrupt_success_payload(tmp_path: Path):
+    db_path = tmp_path / "history.sqlite3"
+    history = RunHistory(db_path)
+    history.record("ds-1", "b" * 64, "analytics", "SUCCEEDED", {"schema_version": "2.0.0", "value": "valid"}, "LOCAL")
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "INSERT INTO runs(dataset_id,fingerprint,operation,engine,status,created_at,result_json) VALUES(?,?,?,?,?,?,?)",
+            ("ds-1", "b" * 64, "analytics", "LOCAL", "SUCCEEDED", "2026-01-01T00:00:00+00:00", "{not-json"),
+        )
+        db.commit()
+
+    recovered = history.latest_matching("ds-1", "analytics", "b" * 64, "2.0.0")
+    assert recovered is not None
+    assert recovered["value"] == "valid"
