@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 
 def _spark_session(master: str | None = None):
@@ -28,19 +28,12 @@ def _number_columns(df, canonical_to_source: dict[str, str]) -> dict[str, str]:
     return result
 
 
-def analyze_spark(path: Path, mappings: dict[str, str], max_categories: int = 5, master: str | None = None) -> dict[str, Any]:
-    """Distributed descriptive analytics. Only bounded aggregates are collected.
-
-    ``master`` is optional for controlled target-environment validation. When it is
-    omitted, ``HR_ANALYTICS_SPARK_MASTER`` is used and otherwise the safe local[*]
-    default is retained. No cluster endpoint is persisted in analytical results.
-    """
+def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) -> dict[str, Any]:
+    """Run the bounded descriptive aggregation over an existing Spark DataFrame."""
     from pyspark.sql import functions as F
 
     source_to_canonical = {source: canonical for source, canonical in mappings.items() if canonical != "unknown"}
     canonical_to_source = {canonical: source for source, canonical in source_to_canonical.items()}
-    spark = _spark_session(master)
-    df = spark.read.option("header", True).option("inferSchema", True).csv(str(path))
     row_count = df.count()
 
     missing = []
@@ -119,5 +112,40 @@ def analyze_spark(path: Path, mappings: dict[str, str], max_categories: int = 5,
         "categorical_summary": categorical_summary,
         "missing_by_field": sorted(missing, key=lambda item: item["field"]),
         "insights": insights,
-        "execution": {"engine": "SPARK", "distributed": not (master or os.getenv("HR_ANALYTICS_SPARK_MASTER", "local[*]")).startswith("local"), "raw_rows_returned": False},
+        "execution": {"engine": "SPARK", "distributed": True, "raw_rows_returned": False},
     }
+
+
+def analyze_spark(path: Path, mappings: dict[str, str], max_categories: int = 5, master: str | None = None) -> dict[str, Any]:
+    """Distributed descriptive analytics. Only bounded aggregates are collected.
+
+    ``master`` is optional for controlled target-environment validation. When it is
+    omitted, ``HR_ANALYTICS_SPARK_MASTER`` is used and otherwise the safe local[*]
+    default is retained. No cluster endpoint is persisted in analytical results.
+    """
+    spark = _spark_session(master)
+    df = spark.read.option("header", True).option("inferSchema", True).csv(str(path))
+    result = _analyze_dataframe(df, mappings, max_categories=max_categories)
+    result["execution"]["distributed"] = not (master or os.getenv("HR_ANALYTICS_SPARK_MASTER", "local[*]")).startswith("local")
+    return result
+
+
+def analyze_spark_csv_lines(lines: Iterable[str], mappings: dict[str, str], max_categories: int = 5, master: str | None = None) -> dict[str, Any]:
+    """Analyze CSV text without requiring an executor to access the driver's filesystem.
+
+    The bounded external-cluster validation protocol uses this path because a
+    driver-local temporary file is not a portable input source for a multi-node
+    Spark deployment. CSV lines are transferred to the configured Spark cluster
+    through an RDD, then the same DataFrame aggregation logic is used.
+    """
+    spark = _spark_session(master)
+    materialized = list(lines)
+    if not materialized:
+        raise ValueError("CSV input must contain at least a header row")
+    parallelism = max(1, min(len(materialized), spark.sparkContext.defaultParallelism * 2))
+    rdd = spark.sparkContext.parallelize(materialized, parallelism)
+    df = spark.read.option("header", True).option("inferSchema", True).csv(rdd)
+    result = _analyze_dataframe(df, mappings, max_categories=max_categories)
+    result["execution"]["distributed"] = not (master or os.getenv("HR_ANALYTICS_SPARK_MASTER", "local[*]")).startswith("local")
+    result["execution"]["input_mode"] = "driver_parallelized_csv"
+    return result
