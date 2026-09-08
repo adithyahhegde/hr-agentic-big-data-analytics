@@ -48,9 +48,9 @@ jobs:
         run: python scripts/scalability_evaluation.py --sizes 100 1000 10000 --seed 42 --repeats 1 --output artifacts/scalability.json
       - name: Run explainability smoke test
         run: pytest -q tests/test_shap_explainability.py
-      - name: Run external Spark validation when target cluster is configured
+      - name: Run external Spark scalability validation when target cluster is configured
         if: ${{ env.HR_ANALYTICS_SPARK_MASTER != '' }}
-        run: python scripts/external_spark_validation.py --rows 10000 --seed 42 --output artifacts/external-spark.json
+        run: python scripts/external_spark_validation.py --sizes 100 1000 10000 --seed 42 --output artifacts/external-spark.json
       - name: Validate evaluation artifacts
         run: |
           python - <<'PY'
@@ -103,14 +103,18 @@ jobs:
           external = Path('artifacts/external-spark.json')
           if external.exists():
               result = json.loads(external.read_text())
-              assert result['protocol'] == 'external_spark_validation_v1'
-              assert result['rows'] == 10000
+              assert result['protocol'] == 'external_spark_scalability_v1'
+              assert result['sizes'] == [100, 1000, 10000]
               assert result['seed'] == 42
-              assert result['validation'] == {
-                  'row_count_matches_fixture': True,
-                  'raw_rows_returned': False,
-                  'distributed': True,
-              }
+              assert [run['rows'] for run in result['runs']] == result['sizes']
+              for run in result['runs']:
+                  assert run['validation'] == {
+                      'row_count_matches_fixture': True,
+                      'raw_rows_returned': False,
+                      'distributed': True,
+                  }
+                  assert run['elapsed_seconds'] >= 0
+                  assert run['rows_per_second'] is not None and run['rows_per_second'] > 0
           PY
       - name: Upload reproducible evaluation artifacts
         uses: actions/upload-artifact@v4
