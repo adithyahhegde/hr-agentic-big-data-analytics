@@ -17,7 +17,7 @@ REQUIRED_MARKERS = {
     "README.md": (
         "A successful CI evaluation run on 2026-09-08",
         "External Spark target-cluster scalability has not yet been measured.",
-        "application-level API-key identity",
+        "application-level API-key identities scope",
     ),
     "docs/IMPLEMENTATION.md": (
         "[x] Reproducible local scalability measurements at 100, 1,000, and 10,000 rows",
