@@ -33,14 +33,14 @@ python scripts/agent_reliability_evaluation.py --seed 42 --output agent-reliabil
 python scripts/scalability_evaluation.py --sizes 100 1000 10000 --seed 42 --repeats 1 --output scalability.json
 ```
 
-A GitHub Actions evaluation workflow at `.github/workflows/evaluation.yml` executes the feasibility protocol, comparative mapping, bounded-agent reliability, robustness benchmark matrix, and local scalability measurement on relevant `main` changes and manual dispatch. It uploads the generated JSON outputs as a 30-day workflow artifact and fails if the deterministic fixture-contract assertions do not hold. This creates an executable validation path; it does not substitute for target-environment Spark scalability measurements.
+A GitHub Actions evaluation workflow at `.github/workflows/evaluation.yml` executes the feasibility protocol, comparative mapping, bounded-agent reliability, robustness benchmark matrix, local scalability measurement, and explainability smoke test on relevant `main` changes and manual dispatch. It uploads the generated JSON outputs as a 30-day workflow artifact and fails if the deterministic fixture-contract assertions do not hold. This creates an executable validation path; it does not substitute for target-environment Spark scalability measurements.
 
 The benchmark harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, task-feasibility results, and aggregate consistency checks. It does not print or persist employee-level records. The matrix covers clean, renamed, categorical, mixed, missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy conditions plus deliberately invalid ambiguous/leakage-prone mappings. Invalid mapping scenarios are reported as `BLOCKED_COLLISION` and are not executed as if they were valid analytical inputs.
 
 ## Functional metrics
 
 - schema mapping precision/recall against a labelled mapping fixture
-- comparative exact-mapping accuracy against a name-only normalization/alias baseline
+- comparative exact-mapping accuracy against a normalized-name-only baseline that recognizes canonical field names but intentionally ignores aliases
 - percentage of ambiguous mappings correctly abstained
 - task-feasibility precision against expected capabilities
 - analytics aggregate consistency between local and Spark paths within defined tolerances
@@ -50,7 +50,7 @@ The benchmark harness reports elapsed time, throughput, row/duplicate counts, se
 - failure responses are structured and recorded in run history
 - planner-to-synthesis safety rate across valid, blocked, unsupported, malformed, provenance-mismatched, and bounded-evidence scenarios
 
-`scripts/schema_mapping_evaluation.py` executes the labelled mapping comparison on the deterministic heterogeneous fixtures. The baseline uses only normalized source names and canonical aliases; the product path uses the existing profile-aware mapping engine. Ambiguous and leakage-prone fixtures are excluded from exact-mapping accuracy because the correct behaviour is abstention rather than forced assignment. The output reports both methods' exact-match counts and accuracy, but it does not by itself establish generalization to real-world HR schemas.
+`scripts/schema_mapping_evaluation.py` executes the labelled mapping comparison on the deterministic heterogeneous fixtures. The baseline intentionally uses only normalized source names that exactly equal canonical field names; it does not use the product's alias dictionary. The product path uses the existing profile-aware mapping engine with type/value/profile evidence. This makes the baseline a genuinely weaker name-only comparator rather than a second implementation of the same alias rules. Ambiguous and leakage-prone fixtures are excluded from exact-mapping accuracy because the correct behaviour is abstention rather than forced assignment. The output reports both methods' exact-match counts and accuracy, but it does not by itself establish generalization to real-world HR schemas.
 
 The objective-feasibility runner is an executable protocol for the task-feasibility metric. Its fixture labels are explicit benchmark assumptions, not measurements of real-world HR datasets. The output should therefore be reported as a benchmark result only after execution in the target environment.
 
@@ -82,4 +82,4 @@ Report both successes and abstentions/failures. A useful evaluation should demon
 
 ## Current evidence status
 
-The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix, explicit schema-gate handling for ambiguous/leakage-prone mappings, and executable data-quality stress fixtures. Objective-feasibility, comparative schema-mapping, bounded-agent reliability, and local scalability evaluation are executable protocols. No empirical accuracy or scalability claim is made here until workflow artifacts are inspected and, for Spark claims, the target environment has been measured. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
+The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix, explicit schema-gate handling for ambiguous/leakage-prone mappings, and executable data-quality stress fixtures. Objective-feasibility, comparative schema-mapping, bounded-agent reliability, local scalability, and optional SHAP explainability evaluation are executable protocols. No empirical accuracy or scalability claim is made here until workflow artifacts are inspected and, for Spark claims, the target environment has been measured. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.

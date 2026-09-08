@@ -1,4 +1,4 @@
-"""Evaluate canonical schema mapping against a name-only baseline on deterministic fixtures."""
+"""Evaluate canonical schema mapping against a normalized-name baseline on deterministic fixtures."""
 from __future__ import annotations
 
 import argparse
@@ -21,9 +21,11 @@ def _rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
 
 
 def _baseline_mapping(source_name: str) -> str | None:
+    """Map only an exact normalized canonical field name; deliberately ignore aliases."""
     normalized = normalize_name(source_name)
-    matches = [name for name, definition in CANONICAL_FIELDS.items() if normalized in definition.aliases]
-    return matches[0] if len(matches) == 1 else None
+    if normalized in CANONICAL_FIELDS:
+        return normalized
+    return None
 
 
 def evaluate(*, sizes: tuple[int, ...] = (20, 100), seed: int = 42) -> dict[str, Any]:
