@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 
-def _spark_session():
+def _spark_session(master: str | None = None):
     from pyspark.sql import SparkSession
 
+    configured_master = master or os.getenv("HR_ANALYTICS_SPARK_MASTER") or "local[*]"
     return (
         SparkSession.builder
         .appName("hr-agentic-big-data-analytics")
-        .master("local[*]")
-        .config("spark.sql.shuffle.partitions", "200")
+        .master(configured_master)
+        .config("spark.sql.shuffle.partitions", os.getenv("HR_ANALYTICS_SPARK_SHUFFLE_PARTITIONS", "200"))
         .getOrCreate()
     )
 
@@ -26,13 +28,18 @@ def _number_columns(df, canonical_to_source: dict[str, str]) -> dict[str, str]:
     return result
 
 
-def analyze_spark(path: Path, mappings: dict[str, str], max_categories: int = 5) -> dict[str, Any]:
-    """Distributed descriptive analytics. Only bounded aggregates are collected."""
+def analyze_spark(path: Path, mappings: dict[str, str], max_categories: int = 5, master: str | None = None) -> dict[str, Any]:
+    """Distributed descriptive analytics. Only bounded aggregates are collected.
+
+    ``master`` is optional for controlled target-environment validation. When it is
+    omitted, ``HR_ANALYTICS_SPARK_MASTER`` is used and otherwise the safe local[*]
+    default is retained. No cluster endpoint is persisted in analytical results.
+    """
     from pyspark.sql import functions as F
 
     source_to_canonical = {source: canonical for source, canonical in mappings.items() if canonical != "unknown"}
     canonical_to_source = {canonical: source for source, canonical in source_to_canonical.items()}
-    spark = _spark_session()
+    spark = _spark_session(master)
     df = spark.read.option("header", True).option("inferSchema", True).csv(str(path))
     row_count = df.count()
 
@@ -112,5 +119,5 @@ def analyze_spark(path: Path, mappings: dict[str, str], max_categories: int = 5)
         "categorical_summary": categorical_summary,
         "missing_by_field": sorted(missing, key=lambda item: item["field"]),
         "insights": insights,
-        "execution": {"engine": "SPARK", "distributed": True, "raw_rows_returned": False},
+        "execution": {"engine": "SPARK", "distributed": not (master or os.getenv("HR_ANALYTICS_SPARK_MASTER", "local[*]")).startswith("local"), "raw_rows_returned": False},
     }
