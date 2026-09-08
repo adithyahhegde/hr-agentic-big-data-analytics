@@ -32,6 +32,8 @@ jobs:
         run: python scripts/feasibility_evaluation.py --sizes 10 20 100 --seed 42 --output artifacts/feasibility.json
       - name: Run schema-mapping comparison
         run: python scripts/schema_mapping_evaluation.py --sizes 20 100 --seed 42 --output artifacts/schema-mapping.json
+      - name: Run bounded agent reliability evaluation
+        run: python scripts/agent_reliability_evaluation.py --seed 42 --output artifacts/agent-reliability.json
       - name: Run robustness benchmark matrix
         run: python scripts/benchmark.py --matrix --output artifacts/benchmark.json
       - name: Validate evaluation artifacts
@@ -42,6 +44,7 @@ jobs:
 
           feasibility = json.loads(Path('artifacts/feasibility.json').read_text())
           mapping = json.loads(Path('artifacts/schema-mapping.json').read_text())
+          agent = json.loads(Path('artifacts/agent-reliability.json').read_text())
           benchmark = json.loads(Path('artifacts/benchmark.json').read_text())
 
           assert feasibility['seed'] == 42
@@ -55,6 +58,12 @@ jobs:
           assert mapping['aggregate']['evaluated_columns'] > 0
           assert mapping['aggregate']['semantic_accuracy'] is not None
           assert mapping['aggregate']['baseline_accuracy'] is not None
+
+          assert agent['protocol'] == 'bounded_agent_reliability_v1'
+          assert agent['seed'] == 42
+          assert agent['aggregate']['scenario_count'] == 7
+          assert agent['aggregate']['safe_scenarios'] == 7
+          assert agent['aggregate']['safety_rate'] == 1.0
 
           assert benchmark['seed'] == 42
           assert benchmark['sizes'] == [100, 1000, 10000]
