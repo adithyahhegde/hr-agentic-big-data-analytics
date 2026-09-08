@@ -16,7 +16,7 @@ The agentic layer is a constrained evidence synthesizer rather than an unrestric
 
 ## Big-data execution
 
-Workloads are routed using explicit engineering thresholds for row count, estimated bytes, column count, file count, or an explicit distributed requirement. Small workloads use the lightweight local path; routed large workloads use Spark. Spark execution is configurable through `HR_ANALYTICS_SPARK_MASTER` and defaults to local-distributed (`local[*]`). The repository includes an opt-in protocol for validating the same path against a real external Spark cluster; no external-cluster performance claim is made until that protocol is executed against a reachable target environment.
+Workloads are routed using explicit engineering thresholds for row count, estimated bytes, column count, file count, or an explicit distributed requirement. Small workloads use the lightweight local path; routed large workloads use Spark. Spark execution is configurable through `HR_ANALYTICS_SPARK_MASTER` and defaults to local-distributed (`local[*]`). The repository includes an opt-in protocol for validating the same path against a real external Spark cluster. The external protocol exercises 100, 1,000, and 10,000-row fixtures, records aggregate-only wall-clock/throughput evidence, and rejects local or loopback targets. No external-cluster performance claim is made until that protocol is executed against a reachable target environment.
 
 ## Persistence and reproducibility
 
@@ -47,7 +47,7 @@ The benchmark harness can compare local and Spark descriptive execution when PyS
 
 The project deliberately makes **no broad novelty or "first" claim**. Existing agentic data-science, enterprise analytics, workforce analytics and HR decision-support systems overlap with the broad concept. The research direction is narrower: evaluate whether confidence-aware HR schema interpretation, objective-feasibility gates, bounded evidence-led planning/synthesis, automated model search, scalable routing, and provenance improve reliability on heterogeneous HR datasets.
 
-The repository includes deterministic benchmark generation plus regression tests for routing, data quality, schema interpretation, persistence/provenance, bounded synthesis, report privacy, bounded AutoML guardrails, explainability, and benchmark behavior. CI installs the `dev,ml,explainability` environment for the reproducible evaluation workflow; Spark and AutoML remain optional dependencies and are handled explicitly by their respective paths.
+The repository includes deterministic benchmark generation plus regression tests for routing, data quality, schema interpretation, persistence/provenance, bounded synthesis, report privacy, bounded AutoML guardrails, explainability, and benchmark behavior. The reproducible evaluation workflow installs the `dev,ml,explainability,bigdata` environment so Spark-backed validation can run when an external target is configured.
 
 A successful CI evaluation run on 2026-09-08 recorded fixture-based empirical evidence for objective feasibility, comparative schema mapping, bounded agent reliability, robustness/scalability, and the optional SHAP smoke test. The detailed values and limitations are recorded in `docs/EVALUATION_RESULTS.md`. These measurements are not evidence of real-world HR generalization or production decision performance.
 
