@@ -21,7 +21,9 @@ ml = [
   "pandas>=2.2,<3",
   "scikit-learn>=1.5,<2",
 ]
-
+explainability = [
+  "shap>=0.45,<1",
+]
 automl = [
   "flaml[automl]>=2.4,<3",
 ]

@@ -133,6 +133,33 @@ def _regression_models(seed: int):
     }
 
 
+def _shap_importance(model: Any, features: list[str], X_test: Any) -> list[dict[str, Any]]:
+    """Return bounded global SHAP importance when the optional dependency supports the model.
+
+    The result is deliberately aggregate: no row-level SHAP values leave the engine.
+    Failures fall back to the existing model/permutation explainability path.
+    """
+    try:
+        import numpy as np
+        import shap
+
+        sample = X_test[: min(len(X_test), 100)]
+        if len(sample) == 0:
+            return []
+        explainer = shap.Explainer(model, sample, feature_names=features)
+        values = explainer(sample, max_evals=2000).values
+        values = np.asarray(values)
+        if values.ndim == 3:
+            values = np.mean(np.abs(values), axis=2)
+        if values.ndim != 2 or values.shape[1] != len(features):
+            return []
+        importance = np.mean(np.abs(values), axis=0)
+        pairs = sorted(zip(features, importance.tolist()), key=lambda item: item[1], reverse=True)
+        return [{"feature": name, "importance": round(float(value), 6)} for name, value in pairs[:10]]
+    except Exception:
+        return []
+
+
 def _feature_importance(model: Any, features: list[str], X_test: Any, y_test: Any, seed: int) -> list[dict[str, Any]]:
     values = getattr(model, "feature_importances_", None)
     if values is None and hasattr(model, "coef_"):
@@ -205,13 +232,29 @@ def run_ml(path: Path, mappings: dict[str, str], objective: str, target: str, fe
         results.append({"model": name, "metrics": metrics, "selection_score": round(score, 6)})
     results.sort(key=lambda item: item["selection_score"], reverse=True)
     best = results[0]
+    best_model = fitted[best["model"]]
+    shap_features = _shap_importance(best_model, list(feature_names), X_test)
+    if shap_features:
+        explainability = {
+            "method": "shap_global_mean_abs",
+            "top_features": shap_features,
+            "sample_rows": min(len(X_test), 100),
+            "bounded": True,
+            "limitations": ["global aggregate attribution only", "SHAP is optional and model/support dependent", "not causal explanation"],
+        }
+    else:
+        explainability = {
+            "method": "model_importance_or_permutation",
+            "top_features": _feature_importance(best_model, list(feature_names), X_test, y_test, seed),
+            "limitations": ["SHAP unavailable or unsupported for the selected model"],
+        }
     return {
         "objective": objective, "target_field": target, "feature_fields": list(feature_names),
         "rows_used": int(len(X)), "train_rows": int(len(X_train)), "test_rows": int(len(X_test)),
         "models": results, "selected_model": best["model"],
         "selection_metric": "f1" if classification else "rmse",
-        "explainability": {"method": "model_importance_or_permutation", "top_features": _feature_importance(fitted[best["model"]], list(feature_names), X_test, y_test, seed)},
-        "safeguards": ["confirmed target only", "identifier exclusion", "constant-feature exclusion", "reproducible holdout seed", "no external model API"],
+        "explainability": explainability,
+        "safeguards": ["confirmed target only", "identifier exclusion", "constant-feature exclusion", "reproducible holdout seed", "no external model API", "bounded aggregate SHAP when available"],
     }
 
 
