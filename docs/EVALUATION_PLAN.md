@@ -29,6 +29,7 @@ python scripts/benchmark.py --rows 100000 --seed 42 --scenario clean --output be
 python scripts/benchmark.py --matrix --seed 42 --output benchmark-matrix.json
 python scripts/feasibility_evaluation.py --sizes 10 20 100 --seed 42 --output feasibility.json
 python scripts/schema_mapping_evaluation.py --sizes 20 100 --seed 42 --output schema-mapping.json
+python scripts/agent_reliability_evaluation.py --seed 42 --output agent-reliability.json
 ```
 
 A GitHub Actions evaluation workflow at `.github/workflows/evaluation.yml` executes the feasibility protocol and benchmark matrix on relevant `main` changes and manual dispatch. It uploads the generated JSON outputs as a 30-day workflow artifact and fails if the deterministic fixture-contract assertions do not hold. This creates an executable validation path; it does not substitute for target-environment Spark scalability measurements.
@@ -46,10 +47,13 @@ The benchmark harness reports elapsed time, throughput, row/duplicate counts, se
 - no raw employee records in ML/agent/report outputs
 - report provenance completeness
 - failure responses are structured and recorded in run history
+- planner-to-synthesis safety rate across valid, blocked, unsupported, malformed, provenance-mismatched, and bounded-evidence scenarios
 
 `scripts/schema_mapping_evaluation.py` executes the labelled mapping comparison on the deterministic heterogeneous fixtures. The baseline uses only normalized source names and canonical aliases; the product path uses the existing profile-aware mapping engine. Ambiguous and leakage-prone fixtures are excluded from exact-mapping accuracy because the correct behaviour is abstention rather than forced assignment. The output reports both methods' exact-match counts and accuracy, but it does not by itself establish generalization to real-world HR schemas.
 
 The objective-feasibility runner is an executable protocol for the task-feasibility metric. Its fixture labels are explicit benchmark assumptions, not measurements of real-world HR datasets. The output should therefore be reported as a benchmark result only after execution in the target environment.
+
+The bounded-agent reliability runner at `scripts/agent_reliability_evaluation.py` composes the actual deterministic planner and evidence synthesizer. It checks valid evidence flow, planner abstention, unsupported-objective rejection, cross-dataset provenance rejection, malformed anomaly rejection, recommendation citation integrity, and evidence bounds. This is a service-contract reliability protocol; it is not a measure of LLM quality, human analyst agreement, or real-world HR generalization.
 
 ## Scalability metrics
 
@@ -75,4 +79,4 @@ Report both successes and abstentions/failures. A useful evaluation should demon
 
 ## Current evidence status
 
-The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix, explicit schema-gate handling for ambiguous/leakage-prone mappings, and executable data-quality stress fixtures. Objective-feasibility and comparative schema-mapping evaluation are executable protocols. No empirical accuracy or scalability claim is made here until workflow artifacts are inspected and, for Spark claims, the target environment has been measured. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
+The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix, explicit schema-gate handling for ambiguous/leakage-prone mappings, and executable data-quality stress fixtures. Objective-feasibility, comparative schema-mapping, and bounded-agent reliability evaluation are executable protocols. No empirical accuracy or scalability claim is made here until workflow artifacts are inspected and, for Spark claims, the target environment has been measured. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
