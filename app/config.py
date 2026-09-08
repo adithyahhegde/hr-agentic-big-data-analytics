@@ -17,6 +17,21 @@ class Settings:
     automl_time_budget_seconds: int = 30
     data_dir: Path = Path("data")
     api_key: str = ""
+    api_keys: tuple[tuple[str, str], ...] = ()
+
+
+def _parse_api_keys(raw: str) -> tuple[tuple[str, str], ...]:
+    """Parse ``user=key;user2=key2`` without logging or exposing secrets."""
+    entries: list[tuple[str, str]] = []
+    for item in raw.split(";"):
+        item = item.strip()
+        if not item or "=" not in item:
+            continue
+        user_id, key = item.split("=", 1)
+        user_id, key = user_id.strip(), key.strip()
+        if user_id and key:
+            entries.append((user_id, key))
+    return tuple(entries)
 
 
 def get_settings() -> Settings:
@@ -32,4 +47,5 @@ def get_settings() -> Settings:
         automl_time_budget_seconds=max(1, min(600, int(os.getenv("HR_ANALYTICS_AUTOML_TIME_BUDGET_SECONDS", 30)))),
         data_dir=Path(os.getenv("HR_ANALYTICS_DATA_DIR", "data")),
         api_key=os.getenv("HR_ANALYTICS_API_KEY", ""),
+        api_keys=_parse_api_keys(os.getenv("HR_ANALYTICS_API_KEYS", "")),
     )
