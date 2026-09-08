@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.models import DatasetProfile, SchemaAcceptanceRequest, SchemaAcceptanceResponse, TaskCandidateResponse, TaskDetectionResponse, WorkloadRoutingRequest, WorkloadRoutingResponse
+from app.services.access_control import authenticate_api_key, reset_current_user, set_current_user
 from app.services.analytics import analyze_csv
 from app.services.automl_engine import run_automl
 from app.services.big_data_engine import read_csv
@@ -41,15 +42,27 @@ ml_runs: dict[tuple[str, str], dict[str, object]] = {}
 
 @app.middleware("http")
 async def require_api_key(request: Request, call_next):
-    """Optionally protect API endpoints with a constant-time API-key check.
+    """Authenticate API requests and bind their durable dataset identity.
 
-    Authentication is disabled when HR_ANALYTICS_API_KEY is unset. Health remains
-    public so orchestrators can probe the service without credentials.
+    With per-user credentials configured through HR_ANALYTICS_API_KEYS, the
+    credential itself determines the request identity; client-supplied user
+    headers are deliberately ignored. The legacy single HR_ANALYTICS_API_KEY
+    maps to the local user. Health remains public.
     """
-    if settings.api_key and request.url.path.startswith("/api/") and request.url.path != "/api/health":
+    is_protected = request.url.path.startswith("/api/") and request.url.path != "/api/health"
+    if not is_protected:
+        return await call_next(request)
+
+    if settings.api_keys or settings.api_key:
         supplied = request.headers.get("X-API-Key", "")
-        if not supplied or not secrets.compare_digest(supplied, settings.api_key):
+        user_id = authenticate_api_key(supplied, settings.api_key, settings.api_keys)
+        if user_id is None:
             return JSONResponse(status_code=401, content={"detail": "Authentication required."})
+        token = set_current_user(user_id)
+        try:
+            return await call_next(request)
+        finally:
+            reset_current_user(token)
     return await call_next(request)
 
 
