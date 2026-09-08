@@ -26,7 +26,7 @@ REQUIRED_MARKERS = {
         "[x] Executable bounded planner-to-synthesis reliability/abstention evaluation, with CI evidence recorded.",
         "[x] SHAP smoke evaluation contract and CI smoke execution for optional local explainability.",
         "[ ] External Spark target-cluster scalability validation.",
-        "[ ] Documentation consistency audit after final feature freeze.",
+        "[x] Documentation consistency audit after final feature freeze.",
     ),
     "docs/EVALUATION_RESULTS.md": (
         "GitHub Actions run `34212312393`",
