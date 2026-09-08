@@ -1,0 +1,21 @@
+# Research Stage Checklist
+
+- [ ] Final research question and hypotheses/expectations
+- [ ] Literature matrix with verified sources
+- [ ] Dataset selected and provenance recorded
+- [ ] Feasibility test completed
+- [ ] Experimental design frozen before main runs
+- [ ] Environment/version capture
+- [ ] Baseline implementation
+- [ ] Distributed implementation
+- [ ] Repeated controlled runs
+- [ ] Raw results preserved
+- [ ] Analysis scripts produce all reported metrics
+- [ ] Figures/tables regenerated from raw results
+- [ ] Statistical/robustness checks completed where appropriate
+- [ ] Results independently stress-tested
+- [ ] Paper claims traced to evidence
+- [ ] APA references verified
+- [ ] Final DOCX rendered and visually inspected
+- [ ] Final PDF rendered and visually inspected
+- [ ] Final invigilator pass
