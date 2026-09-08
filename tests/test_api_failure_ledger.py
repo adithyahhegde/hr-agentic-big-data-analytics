@@ -4,7 +4,7 @@ import app.main as main
 from app.services.run_history import RunHistory
 
 
-client = TestClient(main.app)
+client = TestClient(main.app, raise_server_exceptions=False)
 
 
 def _profile_and_accept(rows: str) -> dict:
