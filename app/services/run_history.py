@@ -14,6 +14,7 @@ class RunHistory:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.path) as db:
             db.execute("CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY AUTOINCREMENT, dataset_id TEXT NOT NULL, fingerprint TEXT NOT NULL, operation TEXT NOT NULL, engine TEXT, status TEXT NOT NULL, created_at TEXT NOT NULL, result_json TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS explanation_artifacts (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER NOT NULL UNIQUE, dataset_id TEXT NOT NULL, fingerprint TEXT NOT NULL, schema_version TEXT, operation TEXT NOT NULL, created_at TEXT NOT NULL, artifact_json TEXT NOT NULL)")
             db.commit()
 
     def record(self, dataset_id: str, fingerprint: str, operation: str, status: str, result: dict[str, Any], engine: str | None = None) -> int:
@@ -31,6 +32,66 @@ class RunHistory:
     def record_failure_safe(self, dataset_id: str, fingerprint: str, operation: str, error_type: str, engine: str | None = None) -> int:
         safe_type = str(error_type).split(".")[-1][:100] or "Exception"
         return self.record(dataset_id, fingerprint, operation, "FAILED", {"error_type": safe_type, "message": "Execution failed; inspect server logs for diagnostic details.", "recoverable": safe_type in {"ValueError", "RuntimeError"}}, engine)
+
+    def record_explanation(self, run_id: int, dataset_id: str, fingerprint: str, operation: str, explanation: dict[str, Any], schema_version: str | None = None) -> int:
+        """Persist a bounded, non-row-level explanation artifact for a successful run."""
+        method = str(explanation.get("method", "unspecified"))[:120]
+        raw_features = explanation.get("top_features", [])
+        features: list[dict[str, Any]] = []
+        if isinstance(raw_features, list):
+            for item in raw_features[:10]:
+                if not isinstance(item, dict):
+                    continue
+                feature = str(item.get("feature", ""))[:200]
+                if not feature:
+                    continue
+                safe_item = {"feature": feature}
+                if "importance" in item:
+                    try:
+                        safe_item["importance"] = round(float(item["importance"]), 6)
+                    except (TypeError, ValueError):
+                        continue
+                features.append(safe_item)
+        artifact = {"method": method, "top_features": features, "limitations": [str(value)[:300] for value in explanation.get("limitations", [])[:5]] if isinstance(explanation.get("limitations"), list) else []}
+        created_at = datetime.now(timezone.utc).isoformat()
+        with sqlite3.connect(self.path) as db:
+            cursor = db.execute("INSERT OR REPLACE INTO explanation_artifacts(run_id,dataset_id,fingerprint,schema_version,operation,created_at,artifact_json) VALUES(?,?,?,?,?,?,?)", (run_id, dataset_id, fingerprint, schema_version, operation, created_at, json.dumps(artifact, default=str)))
+            db.commit()
+            return int(cursor.lastrowid)
+
+    def latest_explanation(self, dataset_id: str, operation: str | None = None, fingerprint: str | None = None, schema_version: str | None = None) -> dict[str, Any] | None:
+        """Return the newest explanation artifact matching the current dataset lineage."""
+        query = "SELECT * FROM explanation_artifacts WHERE dataset_id=?"
+        params: list[Any] = [dataset_id]
+        if operation:
+            query += " AND operation=?"
+            params.append(operation)
+        if fingerprint:
+            query += " AND fingerprint=?"
+            params.append(fingerprint)
+        if schema_version is not None:
+            query += " AND schema_version=?"
+            params.append(schema_version)
+        query += " ORDER BY id DESC LIMIT 1"
+        with sqlite3.connect(self.path) as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute(query, params).fetchone()
+        if not row:
+            return None
+        try:
+            artifact = json.loads(row["artifact_json"])
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(artifact, dict):
+            return None
+        artifact["artifact_id"] = int(row["id"])
+        artifact["run_id"] = int(row["run_id"])
+        artifact["dataset_id"] = row["dataset_id"]
+        artifact["dataset_fingerprint"] = row["fingerprint"]
+        artifact["schema_version"] = row["schema_version"]
+        artifact["operation"] = row["operation"]
+        artifact["created_at"] = row["created_at"]
+        return artifact
 
     def list(self, dataset_id: str, limit: int = 50) -> list[dict[str, Any]]:
         limit = max(1, min(limit, 200))
