@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Sequence
@@ -91,24 +92,22 @@ def validate_sizes(
     configured_master = _validate_external_master(master)
     runs: list[dict[str, Any]] = []
 
-    for rows in normalized_sizes:
-        path = Path(f"/tmp/hr_external_spark_fixture_{rows}.csv")
-        make_fixture(path, rows, seed, "clean")
-        started = time.perf_counter()
-        try:
+    with tempfile.TemporaryDirectory(prefix="hr_external_spark_") as tmp:
+        for rows in normalized_sizes:
+            path = Path(tmp) / f"fixture-{rows}.csv"
+            make_fixture(path, rows, seed, "clean")
+            started = time.perf_counter()
             lines = path.read_text(encoding="utf-8").splitlines()
             result = analyze_spark_csv_lines(lines, MAPPINGS, master=configured_master)
-        finally:
-            path.unlink(missing_ok=True)
-        elapsed = time.perf_counter() - started
-        validation = _validate_result(result, rows)
-        runs.append({
-            "rows": rows,
-            "elapsed_seconds": round(elapsed, 6),
-            "rows_per_second": round(rows / elapsed, 3) if elapsed > 0 else None,
-            "result": result,
-            "validation": validation,
-        })
+            elapsed = time.perf_counter() - started
+            validation = _validate_result(result, rows)
+            runs.append({
+                "rows": rows,
+                "elapsed_seconds": round(elapsed, 6),
+                "rows_per_second": round(rows / elapsed, 3) if elapsed > 0 else None,
+                "result": result,
+                "validation": validation,
+            })
 
     return {
         "protocol": protocol,
