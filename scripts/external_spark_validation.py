@@ -35,17 +35,26 @@ def validate(*, rows: int = 10_000, seed: int = 42, master: str | None = None) -
         make_fixture(path, rows, seed, "clean")
         result = analyze_spark(path, MAPPINGS, master=configured_master)
 
+    execution = result.get("execution", {})
+    validation = {
+        "row_count_matches_fixture": result.get("row_count") == rows,
+        "raw_rows_returned": execution.get("raw_rows_returned"),
+        "distributed": execution.get("distributed"),
+    }
+    if not validation["row_count_matches_fixture"]:
+        raise RuntimeError("external Spark validation returned an unexpected row count")
+    if validation["distributed"] is not True:
+        raise RuntimeError("configured non-local Spark master did not report distributed execution")
+    if validation["raw_rows_returned"] is not False:
+        raise RuntimeError("external Spark validation must not return raw rows")
+
     return {
         "protocol": "external_spark_validation_v1",
         "rows": rows,
         "seed": seed,
         "master_kind": configured_master.split(":", 1)[0],
         "result": result,
-        "validation": {
-            "row_count_matches_fixture": result.get("row_count") == rows,
-            "raw_rows_returned": result.get("execution", {}).get("raw_rows_returned"),
-            "distributed": result.get("execution", {}).get("distributed"),
-        },
+        "validation": validation,
         "limitation": "Results depend on the configured target Spark cluster, worker resources, Spark version, and network/filesystem configuration.",
     }
 
