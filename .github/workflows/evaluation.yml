@@ -26,8 +26,12 @@ jobs:
           cache: pip
       - name: Install evaluation dependencies
         run: python -m pip install --upgrade pip && pip install -e '.[dev,ml]'
+      - name: Prepare artifacts directory
+        run: mkdir -p artifacts
       - name: Run objective-feasibility evaluation
         run: python scripts/feasibility_evaluation.py --sizes 10 20 100 --seed 42 --output artifacts/feasibility.json
+      - name: Run schema-mapping comparison
+        run: python scripts/schema_mapping_evaluation.py --sizes 20 100 --seed 42 --output artifacts/schema-mapping.json
       - name: Run robustness benchmark matrix
         run: python scripts/benchmark.py --matrix --output artifacts/benchmark.json
       - name: Validate evaluation artifacts
@@ -37,6 +41,7 @@ jobs:
           from pathlib import Path
 
           feasibility = json.loads(Path('artifacts/feasibility.json').read_text())
+          mapping = json.loads(Path('artifacts/schema-mapping.json').read_text())
           benchmark = json.loads(Path('artifacts/benchmark.json').read_text())
 
           assert feasibility['seed'] == 42
@@ -44,10 +49,18 @@ jobs:
           assert feasibility['accuracy']['pipeline'] == 1.0
           assert len(feasibility['records']) == 18
 
+          assert mapping['seed'] == 42
+          assert mapping['sizes'] == [20, 100]
+          assert len(mapping['records']) == 20
+          assert mapping['aggregate']['evaluated_columns'] > 0
+          assert mapping['aggregate']['semantic_accuracy'] is not None
+          assert mapping['aggregate']['baseline_accuracy'] is not None
+
           assert benchmark['seed'] == 42
           assert benchmark['sizes'] == [100, 1000, 10000]
-          assert benchmark['scenarios'] == ['clean', 'messy', 'categorical', 'mixed', 'ambiguous', 'leakage_prone']
-          assert len(benchmark['results']) == 18
+          expected_scenarios = ['clean', 'messy', 'categorical', 'mixed', 'ambiguous', 'leakage_prone', 'missing_heavy', 'duplicate_heavy', 'high_cardinality', 'outlier_heavy']
+          assert benchmark['scenarios'] == expected_scenarios
+          assert len(benchmark['results']) == 30
           for result in benchmark['results']:
               scenario = result['fixture']['scenario']
               expected_gate = 'BLOCKED_COLLISION' if scenario in {'ambiguous', 'leakage_prone'} else 'ACCEPTABLE'
