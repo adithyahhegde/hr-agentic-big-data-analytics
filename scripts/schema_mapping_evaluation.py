@@ -10,7 +10,11 @@ from typing import Any
 
 from app.services.profiling import profile_dataset
 from app.services.schema_engine import CANONICAL_FIELDS, normalize_name
-from scripts.benchmark import SCHEMA_SCENARIOS, SCENARIO_EXPECTATIONS, make_fixture
+
+try:
+    from scripts.benchmark import SCHEMA_SCENARIOS, SCENARIO_EXPECTATIONS, make_fixture
+except ModuleNotFoundError:  # Supports direct execution: `python scripts/schema_mapping_evaluation.py ...`.
+    from benchmark import SCHEMA_SCENARIOS, SCENARIO_EXPECTATIONS, make_fixture
 
 
 def _rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
