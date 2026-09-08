@@ -23,10 +23,16 @@ def test_external_validation_rejects_loopback_master(master):
         validate(rows=10, master=master)
 
 
-@pytest.mark.parametrize("master", ["", "spark://example", "http://example:7077", "spark://example:not-a-port"])
+@pytest.mark.parametrize("master", ["spark://example", "http://example:7077", "spark://example:not-a-port"])
 def test_external_validation_rejects_malformed_master(master):
     with pytest.raises(ValueError, match="spark://host:7077"):
         validate(rows=10, master=master)
+
+
+def test_external_validation_rejects_whitespace_only_master(monkeypatch):
+    monkeypatch.delenv("HR_ANALYTICS_SPARK_MASTER", raising=False)
+    with pytest.raises(ValueError, match="HR_ANALYTICS_SPARK_MASTER"):
+        validate(rows=10, master="   ")
 
 
 def test_external_validation_strips_master_whitespace(monkeypatch):
