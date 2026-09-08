@@ -36,7 +36,7 @@ HR_ANALYTICS_SPARK_MASTER=spark://host:7077 python scripts/external_spark_valida
 
 The GitHub Actions evaluation workflow at `.github/workflows/evaluation.yml` executes feasibility, comparative mapping, bounded-agent reliability, robustness, local scalability, and SHAP smoke evaluation on relevant `main` changes and manual dispatch. When the `HR_ANALYTICS_SPARK_MASTER` secret is configured with a reachable non-loopback Spark master, it additionally runs the external Spark protocol at 100, 1,000, and 10,000 rows. It uploads JSON outputs as a 30-day artifact and fails on deterministic fixture-contract violations. A skipped external step is not scalability evidence.
 
-The external Spark protocol at `scripts/external_spark_validation.py` is opt-in and requires an explicit `spark://host:port` master whose hostname is non-loopback. It rejects local masters, localhost/loopback endpoints, malformed URLs, and blank values before attempting a cluster connection. It validates the clean fixture's distributed descriptive path at multiple increasing sizes, records wall-clock time and rows/second for each size, and never collects raw rows. The repository does not claim external-cluster results until this command is executed against a reachable target cluster and its output is retained as evaluation evidence.
+The external Spark protocol at `scripts/external_spark_validation.py` is opt-in and requires an explicit `spark://host:port` master whose hostname is non-loopback. It rejects local masters, localhost/loopback endpoints, malformed URLs, and blank values before attempting a cluster connection. It validates the clean fixture's distributed descriptive path at multiple increasing sizes, records wall-clock time and rows/second for each size, and never collects raw rows. For portability across multi-node Spark deployments, the validation reads the deterministic CSV fixture on the driver and transfers its CSV lines into the target Spark application through an RDD before applying the same bounded DataFrame aggregation logic; it does not assume executor access to the driver's temporary filesystem. The repository does not claim external-cluster results until this command is executed against a reachable target cluster and its output is retained as evaluation evidence.
 
 ## Functional metrics
 
@@ -59,7 +59,7 @@ The objective-feasibility runner is an executable protocol whose fixture labels 
 
 For increasing synthetic sizes, record ingestion time, analytics wall-clock time, ML wall-clock time where applicable, rows/second, peak memory where measurable, selected engine, and whether raw rows were collected to the driver. `scripts/scalability_evaluation.py` provides bounded local measurement with sorted/de-duplicated sizes and 1–5 median timing repeats. CI measures 100, 1,000, and 10,000-row clean fixtures. These timings are environment-specific evidence, not universal guarantees.
 
-The external Spark protocol now uses the same 100, 1,000, and 10,000-row scale points by default. Each run records aggregate-only results, elapsed wall-clock time, throughput, distributed execution status, and row-count integrity. The protocol intentionally does not interpret one target cluster's timings as universal performance claims; cluster size, worker resources, Spark version, network, storage, and scheduling conditions must accompany any reported result.
+The external Spark protocol now uses the same 100, 1,000, and 10,000-row scale points by default. Each run records aggregate-only results, elapsed wall-clock time, throughput, distributed execution status, and row-count integrity. The target-cluster path uses driver-parallelized CSV input so the validation is not accidentally dependent on a shared local filesystem between the driver and workers. The protocol intentionally does not interpret one target cluster's timings as universal performance claims; cluster size, worker resources, Spark version, network, storage, and scheduling conditions must accompany any reported result.
 
 The successful CI run for commit `c86e337b1ca1a6dcfbf6a8f92f1963fce33c586d` (run `34212312393`, 2026-09-08) measured `0.001977s`, `0.010824s`, and `0.110283s` for 100, 1,000, and 10,000 rows respectively, with `50,584`, `92,391`, and `90,676` rows/second. The 100-row timing is small and noisy; the single-repeat 100× size increase produced a `55.783×` elapsed-time increase. These measurements document the CI environment only and must not be used as universal performance guarantees.
 
@@ -67,7 +67,7 @@ Do not claim Spark is faster for every workload. The evaluation should identify 
 
 ## Reproducibility and academic reporting
 
-Every benchmark should record the dataset fingerprint, schema version, engine, objective, configuration/seed, status, and timestamp. Results should use fixed fixtures and documented tolerances. Report successes and abstentions/failures so the system's ability to avoid unsafe conclusions is visible.
+Every benchmark should record the dataset fingerprint, schema version, engine, objective, configuration/seed, and timestamp. Results should use fixed fixtures and documented tolerances. Report successes and abstentions/failures so the system's ability to avoid unsafe conclusions is visible.
 
 ## Current evidence status
 
