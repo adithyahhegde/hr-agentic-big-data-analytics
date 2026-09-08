@@ -36,7 +36,7 @@
 - [x] Durable local dataset persistence and manifest registry.
 - [x] Scalable descriptive analytics path.
 - [x] Distributed anomaly screening path.
-- [ ] External-cluster scalability validation.
+- [x] External-cluster scalability validation protocol (target-cluster execution outstanding).
 
 ## Phase 5 — Analytics/ML engine
 - [x] Deterministic task detection.
@@ -104,6 +104,6 @@
 A phase is complete only when implementation, tests, documentation, and known limitations agree. New functionality is intentionally marked as implemented but not as empirically validated until the dedicated evaluation protocol has been executed.
 
 ## Current status
-The product now spans upload, deterministic data health, canonical HR schema confirmation, heterogeneous task detection, descriptive analytics, bounded supervised ML comparison with mixed numeric/categorical predictors, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering/anomaly screening, bounded optional SHAP explainability with safe fallback, persistent explanation artifacts, persistent dataset/profile/schema state, owner-scoped persistent run history, durable owner-scoped planner/execution/synthesis workflow state, durable human confirmation gates for future consequential actions, authenticated multi-user dataset ownership isolation, reproducible JSON/HTML reporting, and bounded evidence-to-action synthesis in one workflow.
+The product now spans upload, deterministic data health, canonical HR schema confirmation, heterogeneous task detection, descriptive analytics, bounded supervised ML comparison with mixed numeric/categorical predictors, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering/anomaly screening, bounded optional SHAP explainability with safe fallback, persistent explanation artifacts, persistent dataset/profile/schema state, owner-scoped persistent run history, durable owner-scoped planner/execution/synthesis workflow state, durable human confirmation gates for future consequential actions, authenticated multi-user dataset ownership isolation, reproducible JSON/HTML reporting, bounded evidence-to-action synthesis, and an explicit external-Spark target-environment validation protocol in one workflow.
 
-The remaining research-critical work is primarily **evaluation rather than adding unchecked features**: execute the robustness/scalability protocol, quantify schema-mapping and feasibility reliability, test planner-to-synthesis abstention/failure behavior, validate external Spark scalability, execute the optional SHAP smoke protocol, and document the observed trade-offs. The broad product concept is not claimed as novel; the proposed contribution must be supported by measured results. The current multi-user boundary is application-level API-key identity and dataset/state isolation, not a full IAM/RBAC system.
+The remaining research-critical work is primarily **evaluation rather than adding unchecked features**: execute the robustness/scalability protocol, quantify schema-mapping and feasibility reliability, test planner-to-synthesis abstention/failure behavior, execute external Spark scalability validation against a real target cluster, execute the optional SHAP smoke protocol, and complete the final documentation consistency audit. The broad product concept is not claimed as novel; the proposed contribution must be supported by measured results. The current multi-user boundary is application-level API-key identity and dataset/state isolation, not a full IAM/RBAC system.
