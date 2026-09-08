@@ -17,6 +17,12 @@ This document records observed CI evidence from that run. It is not a claim that
 | Local scalability | 100 rows: `0.001977s`, `50,584 rows/s`; 1,000 rows: `0.010824s`, `92,391 rows/s`; 10,000 rows: `0.110283s`, `90,676 rows/s` | The clean-fixture local descriptive path processed all three sizes successfully. The 100-row timing is small and therefore noisy; the 100× row increase produced a `55.783×` elapsed-time increase in this single-repeat CI run. These are environment-specific measurements, not performance guarantees. |
 | SHAP smoke test | CI step passed | Optional bounded SHAP explainability was exercised in the evaluation environment. The workflow currently records this as a test result rather than a standalone JSON metric. |
 
+## External Spark validation status
+
+The evaluation workflow now contains a conditional external-Spark validation step that runs `scripts/external_spark_validation.py` only when the runner receives a non-empty `HR_ANALYTICS_SPARK_MASTER` value. On GitHub Actions run `34242439083` for commit `54292ec0b7188a6215e85604ac07b49074be592c`, the deterministic evaluation steps all succeeded, but the external-Spark step was **skipped**. The runner therefore did not receive a configured non-local Spark master for this run. No external-cluster scalability result is claimed.
+
+The protocol remains intentionally strict: a valid external result must come from a reachable non-local Spark master and must verify the fixture row count, distributed execution, and absence of raw-row collection. A skipped workflow step is not evidence of scalability. The repository cannot manufacture this evidence without access to an actual target cluster.
+
 ## Reproducibility
 
 - Seed: `42`
