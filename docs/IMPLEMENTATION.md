@@ -66,7 +66,7 @@
 - [x] Structured provenance attached to analytical run records.
 - [x] Durable multi-step planning/execution state machine with restart recovery.
 - [x] Bounded retry/recovery orchestration for workflow steps.
-- [ ] Human confirmation points for consequential agentic actions.
+- [x] Human confirmation gate for consequential action requests, persisted across restart and explicit approval/denial required.
 
 ## Phase 8 — Decision support
 - [x] Deterministic evidence cards.
@@ -102,6 +102,6 @@
 A phase is complete only when implementation, tests, documentation, and known limitations agree. New functionality is intentionally marked as implemented but not as empirically validated until the dedicated evaluation protocol has been executed.
 
 ## Current status
-The product now spans upload, deterministic data health, canonical HR schema confirmation, heterogeneous task detection, descriptive analytics, bounded supervised ML comparison with mixed numeric/categorical predictors, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering/anomaly screening, explainability evidence, bounded persistent explanation artifacts, persistent dataset/profile/schema state, persistent run history, durable bounded planner/execution/synthesis workflow state, reproducible JSON/HTML reporting, and bounded evidence-to-action synthesis in one workflow.
+The product now spans upload, deterministic data health, canonical HR schema confirmation, heterogeneous task detection, descriptive analytics, bounded supervised ML comparison with mixed numeric/categorical predictors, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering/anomaly screening, explainability evidence, bounded persistent explanation artifacts, persistent dataset/profile/schema state, persistent run history, durable bounded planner/execution/synthesis workflow state, durable human confirmation gates for future consequential actions, reproducible JSON/HTML reporting, and bounded evidence-to-action synthesis in one workflow.
 
-The remaining research-critical work is primarily **evaluation rather than adding unchecked features**: execute the robustness/scalability protocol, quantify schema-mapping and feasibility reliability, test planner-to-synthesis abstention/failure behavior, validate external Spark scalability, implement SHAP where justified, add human confirmation boundaries and multi-user access control, and document the observed trade-offs. The broad product concept is not claimed as novel; the proposed contribution must be supported by measured results.
+The remaining research-critical work is primarily **evaluation rather than adding unchecked features**: execute the robustness/scalability protocol, quantify schema-mapping and feasibility reliability, test planner-to-synthesis abstention/failure behavior, validate external Spark scalability, implement SHAP where justified, add multi-user access control, and document the observed trade-offs. The broad product concept is not claimed as novel; the proposed contribution must be supported by measured results.
