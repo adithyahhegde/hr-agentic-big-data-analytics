@@ -16,7 +16,7 @@ The agentic layer is a constrained evidence synthesizer rather than an unrestric
 
 ## Big-data execution
 
-Workloads are routed using explicit engineering thresholds for row count, estimated bytes, column count, file count, or an explicit distributed requirement. Small workloads use the lightweight local path; routed large workloads use Spark. Spark execution is currently local-distributed (`local[*]`) and is intended as a reproducible scalable-processing path, not a claim that every dataset is universally "Big Data".
+Workloads are routed using explicit engineering thresholds for row count, estimated bytes, column count, file count, or an explicit distributed requirement. Small workloads use the lightweight local path; routed large workloads use Spark. Spark execution is configurable through `HR_ANALYTICS_SPARK_MASTER` and defaults to local-distributed (`local[*]`). The repository includes an opt-in protocol for validating the same path against a real external Spark cluster; no external-cluster performance claim is made until that protocol is executed against a reachable target environment.
 
 ## Persistence and reproducibility
 
@@ -49,18 +49,18 @@ The project deliberately makes **no broad novelty or "first" claim**. Existing a
 
 The repository includes deterministic benchmark generation plus regression tests for routing, data quality, schema interpretation, persistence/provenance, bounded synthesis, report privacy, bounded AutoML guardrails, explainability, and benchmark behavior. CI installs the `dev,ml,explainability` environment for the reproducible evaluation workflow; Spark and AutoML remain optional dependencies and are handled explicitly by their respective paths.
 
-Formal comparative robustness/scalability results should only be reported after the benchmark protocol has been executed and recorded. Do not infer research performance from unit-test counts.
+A successful CI evaluation run on 2026-09-08 recorded fixture-based empirical evidence for objective feasibility, comparative schema mapping, bounded agent reliability, robustness/scalability, and the optional SHAP smoke test. The detailed values and limitations are recorded in `docs/EVALUATION_RESULTS.md`. These measurements are not evidence of real-world HR generalization or production decision performance.
 
 ## Product boundary
 
 This is a research-grade implementation foundation, not a validated production HR decision system. Important limitations include:
 
-- Spark uses local distributed execution unless deployed against an external Spark cluster.
+- External Spark target-cluster scalability has not yet been measured.
 - Distributed anomaly detection is a scalable z-score screening method, not an exact distributed equivalent of every local detector.
 - Spark explainability is currently more limited than local feature-importance/permutation/SHAP evidence.
 - The current AutoML implementation is intentionally bounded to local supervised objectives; Spark AutoML and unsupervised AutoML remain separate engineering tracks.
 - Statistical/predictive evidence is associative and does not establish causality.
 - Recommendations require human review and must not be used as automated hiring, firing, promotion, or compensation decisions.
-- External Spark scalability, empirical robustness/scalability measurements, comparative schema/feasibility accuracy, planner-to-synthesis reliability measurements, and SHAP smoke results remain evaluation items until CI or a target environment records them.
+- The recorded evaluation results are deterministic fixture/CI evidence; they do not establish generalization, human agreement, causal validity, or production HR decision quality.
 
-See `docs/MVP_SPEC.md`, `docs/API_CONTRACTS.md`, `docs/AGENT_ENGINE.md`, `docs/IMPLEMENTATION.md`, `docs/RESEARCH_GAP.md`, and `docs/EVALUATION_PROTOCOL.md` for contracts, architecture, research positioning, and evaluation methodology.
+See `docs/MVP_SPEC.md`, `docs/API_CONTRACTS.md`, `docs/AGENT_ENGINE.md`, `docs/IMPLEMENTATION.md`, `docs/RESEARCH_GAP.md`, `docs/EVALUATION_PROTOCOL.md`, and `docs/EVALUATION_RESULTS.md` for contracts, architecture, research positioning, and evaluation methodology/results.

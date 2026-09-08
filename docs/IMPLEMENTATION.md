@@ -93,11 +93,12 @@
 - [x] Benchmark harness with local/Spark optional comparison and consistency checks.
 - [x] Regression tests for routing, profiling, data quality, persistence, provenance, bounded synthesis, reports, and benchmark behavior.
 - [x] Expanded robustness fixture matrix including missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy data plus ambiguous/leakage-prone schema gates.
-- [ ] Scalability measurements at multiple dataset sizes.
-- [x] Comparative schema-mapping evaluation against baseline methods as an executable protocol (empirical execution still outstanding).
-- [x] Executable objective-feasibility evaluation protocol against explicit fixture-contract labels and a weak baseline (empirical execution still outstanding).
-- [x] Executable bounded planner-to-synthesis reliability/abstention evaluation protocol (empirical execution still outstanding).
-- [x] SHAP smoke evaluation contract for optional local explainability (empirical execution still outstanding).
+- [x] Reproducible local scalability measurements at 100, 1,000, and 10,000 rows (CI evidence recorded; timings are environment-specific).
+- [x] Comparative schema-mapping evaluation against baseline methods, with CI evidence recorded.
+- [x] Executable objective-feasibility evaluation against explicit fixture-contract labels and a weak baseline, with CI evidence recorded.
+- [x] Executable bounded planner-to-synthesis reliability/abstention evaluation, with CI evidence recorded.
+- [x] SHAP smoke evaluation contract and CI smoke execution for optional local explainability.
+- [ ] External Spark target-cluster scalability validation.
 - [ ] Documentation consistency audit after final feature freeze.
 
 ## Definition of done
@@ -106,4 +107,4 @@ A phase is complete only when implementation, tests, documentation, and known li
 ## Current status
 The product now spans upload, deterministic data health, canonical HR schema confirmation, heterogeneous task detection, descriptive analytics, bounded supervised ML comparison with mixed numeric/categorical predictors, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering/anomaly screening, bounded optional SHAP explainability with safe fallback, persistent explanation artifacts, persistent dataset/profile/schema state, owner-scoped persistent run history, durable owner-scoped planner/execution/synthesis workflow state, durable human confirmation gates for future consequential actions, authenticated multi-user dataset ownership isolation, reproducible JSON/HTML reporting, bounded evidence-to-action synthesis, and an explicit external-Spark target-environment validation protocol in one workflow.
 
-The remaining research-critical work is primarily **evaluation rather than adding unchecked features**: execute the robustness/scalability protocol, quantify schema-mapping and feasibility reliability, test planner-to-synthesis abstention/failure behavior, execute external Spark scalability validation against a real target cluster, execute the optional SHAP smoke protocol, and complete the final documentation consistency audit. The broad product concept is not claimed as novel; the proposed contribution must be supported by measured results. The current multi-user boundary is application-level API-key identity and dataset/state isolation, not a full IAM/RBAC system.
+The reproducible evaluation workflow has now produced CI evidence for local robustness/scalability, comparative schema mapping, objective feasibility, bounded planner-to-synthesis reliability, and the optional SHAP smoke test. The observed results are recorded in `docs/EVALUATION_RESULTS.md`. Remaining research-critical work is external Spark target-cluster validation and the final documentation consistency audit. These results are fixture- and environment-specific and do not establish generalization to real HR datasets, human agreement, causal validity, or production HR decision performance. The broad product concept is not claimed as novel. The current multi-user boundary is application-level API-key identity and dataset/state isolation, not a full IAM/RBAC system.

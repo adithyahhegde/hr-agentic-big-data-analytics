@@ -57,7 +57,9 @@ The objective-feasibility runner is an executable protocol whose fixture labels 
 
 ## Scalability metrics
 
-For increasing synthetic sizes, record ingestion time, analytics wall-clock time, ML wall-clock time where applicable, rows/second, peak memory where measurable, selected engine, and whether raw rows were collected to the driver. `scripts/scalability_evaluation.py` provides bounded local measurement with sorted/de-duplicated sizes and 1–5 median timing repeats. CI measures 100, 1,000, and 10,000-row clean fixtures. These timings are environment-specific evidence, not universal guarantees. External Spark validation is a separate target-environment requirement.
+For increasing synthetic sizes, record ingestion time, analytics wall-clock time, ML wall-clock time where applicable, rows/second, peak memory where measurable, selected engine, and whether raw rows were collected to the driver. `scripts/scalability_evaluation.py` provides bounded local measurement with sorted/de-duplicated sizes and 1–5 median timing repeats. CI measures 100, 1,000, and 10,000-row clean fixtures. These timings are environment-specific evidence, not universal guarantees.
+
+The successful CI run for commit `c86e337b1ca1a6dcfbf6a8f92f1963fce33c586d` (run `34212312393`, 2026-09-08) measured `0.001977s`, `0.010824s`, and `0.110283s` for 100, 1,000, and 10,000 rows respectively, with `50,584`, `92,391`, and `90,676` rows/second. The 100-row timing is small and noisy; the single-repeat 100× size increase produced a `55.783×` elapsed-time increase. These measurements document the CI environment only and must not be used as universal performance guarantees.
 
 Do not claim Spark is faster for every workload. The evaluation should identify the workload size at which distributed execution becomes operationally useful under the configured environment.
 
@@ -67,4 +69,13 @@ Every benchmark should record the dataset fingerprint, schema version, engine, o
 
 ## Current evidence status
 
-The benchmark harness and deterministic fixture tests are implemented, including the reproducible size/scenario matrix, explicit schema-gate handling, data-quality stress fixtures, comparative schema mapping, objective-feasibility evaluation, bounded-agent reliability evaluation, local scalability evaluation, external Spark validation protocol, and optional SHAP smoke protocol. **No empirical accuracy or scalability claim is made until workflow artifacts are inspected and, for Spark claims, the target environment has been measured.** Benchmark numbers are intentionally generated in the target runtime rather than hard-coded into the repository.
+The reproducible evaluation workflow has now been executed successfully on commit `c86e337b1ca1a6dcfbf6a8f92f1963fce33c586d`. The retained artifact records:
+
+- objective-feasibility pipeline accuracy `1.0` versus weak baseline `0.7778` over 18 fixture/objective records;
+- comparative schema-mapping exact accuracy `0.9811` (`104/106`) versus `0.8679` (`92/106`) for the normalized-name-only baseline;
+- bounded agent reliability safety rate `1.0` across `7/7` scenarios;
+- `30` robustness evaluations across 10 scenarios and three sizes, with 24 accepted cases and 6 schema-collision blocks;
+- local scalability measurements at 100, 1,000, and 10,000 rows;
+- a passing optional SHAP smoke-test step.
+
+Detailed observed values and limitations are recorded in `docs/EVALUATION_RESULTS.md`. The evidence is deterministic fixture/CI evidence, not real-world validation. External Spark target-cluster execution remains outstanding.
