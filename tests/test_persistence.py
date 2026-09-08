@@ -133,3 +133,35 @@ def test_run_history_latest_matching_ignores_corrupt_success_payload(tmp_path: P
     recovered = history.latest_matching("ds-1", "analytics", "b" * 64, "2.0.0")
     assert recovered is not None
     assert recovered["value"] == "valid"
+
+
+def test_run_history_persists_bounded_explanation_artifact(tmp_path: Path):
+    history = RunHistory(tmp_path / "history.sqlite3")
+    result = {
+        "schema_version": "2.0.0",
+        "explainability": {
+            "method": "model_importance_or_permutation",
+            "top_features": [{"feature": f"feature_{i}", "importance": i / 10} for i in range(20)],
+            "limitations": ["limitation " + str(i) for i in range(10)],
+        },
+    }
+    run_id = history.record("ds-1", "b" * 64, "attrition_classification", "SUCCEEDED", result, "LOCAL")
+
+    artifact = history.latest_explanation("ds-1", "attrition_classification", "b" * 64, "2.0.0")
+    assert artifact is not None
+    assert artifact["run_id"] == run_id
+    assert artifact["dataset_fingerprint"] == "b" * 64
+    assert len(artifact["top_features"]) == 10
+    assert len(artifact["limitations"]) == 5
+    assert artifact["top_features"][0]["feature"] == "feature_0"
+
+
+def test_run_history_explanation_is_lineage_scoped(tmp_path: Path):
+    history = RunHistory(tmp_path / "history.sqlite3")
+    history.record("ds-1", "b" * 64, "salary_regression", "SUCCEEDED", {"schema_version": "2.0.0", "explainability": {"method": "permutation", "top_features": [{"feature": "salary", "importance": 1.0}]}}, "LOCAL")
+
+    assert history.latest_explanation("ds-1", "salary_regression", "c" * 64, "2.0.0") is None
+    assert history.latest_explanation("ds-1", "salary_regression", "b" * 64, "3.0.0") is None
+    artifact = history.latest_explanation("ds-1", "salary_regression", "b" * 64, "2.0.0")
+    assert artifact is not None
+    assert artifact["method"] == "permutation"
