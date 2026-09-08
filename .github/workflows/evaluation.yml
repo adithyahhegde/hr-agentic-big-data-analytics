@@ -36,6 +36,8 @@ jobs:
         run: python scripts/agent_reliability_evaluation.py --seed 42 --output artifacts/agent-reliability.json
       - name: Run robustness benchmark matrix
         run: python scripts/benchmark.py --matrix --output artifacts/benchmark.json
+      - name: Run local scalability evaluation
+        run: python scripts/scalability_evaluation.py --sizes 100 1000 10000 --seed 42 --repeats 1 --output artifacts/scalability.json
       - name: Validate evaluation artifacts
         run: |
           python - <<'PY'
@@ -46,6 +48,7 @@ jobs:
           mapping = json.loads(Path('artifacts/schema-mapping.json').read_text())
           agent = json.loads(Path('artifacts/agent-reliability.json').read_text())
           benchmark = json.loads(Path('artifacts/benchmark.json').read_text())
+          scalability = json.loads(Path('artifacts/scalability.json').read_text())
 
           assert feasibility['seed'] == 42
           assert feasibility['sizes'] == [10, 20, 100]
@@ -76,6 +79,13 @@ jobs:
               assert result['schema_gate'] == expected_gate
               if expected_gate == 'BLOCKED_COLLISION':
                   assert result['local']['skipped'] is True
+
+          assert scalability['protocol'] == 'local_scalability_v1'
+          assert scalability['seed'] == 42
+          assert scalability['sizes'] == [100, 1000, 10000]
+          assert len(scalability['records']) == 3
+          assert [r['rows'] for r in scalability['records']] == scalability['sizes']
+          assert all(r['rows_per_second'] > 0 for r in scalability['records'])
           PY
       - name: Upload reproducible evaluation artifacts
         uses: actions/upload-artifact@v4
