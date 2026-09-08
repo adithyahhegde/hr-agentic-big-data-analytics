@@ -1,0 +1,111 @@
+"""Durable, bounded state machine for planner-to-synthesis workflows."""
+from __future__ import annotations
+
+import json
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
+from uuid import uuid4
+
+STEPS = ("PLANNING", "EXECUTION", "SYNTHESIS", "COMPLETED")
+TERMINAL = {"COMPLETED", "FAILED"}
+
+
+class WorkflowStateError(ValueError):
+    """Raised when a workflow transition violates the persisted state machine."""
+
+
+class AgentWorkflowStore:
+    """SQLite-backed workflow state with bounded retry and restart recovery."""
+
+    def __init__(self, path: Path | str = "data/hr_analytics.sqlite3", max_retries: int = 2) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.max_retries = max(0, min(int(max_retries), 5))
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS agent_workflows (id TEXT PRIMARY KEY, dataset_id TEXT NOT NULL, fingerprint TEXT NOT NULL, status TEXT NOT NULL, step TEXT NOT NULL, retry_count INTEGER NOT NULL DEFAULT 0, plan_json TEXT NOT NULL DEFAULT '{}', evidence_json TEXT NOT NULL DEFAULT '{}', result_json TEXT NOT NULL DEFAULT '{}', error_type TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+            )
+            db.commit()
+
+    @staticmethod
+    def _now() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    def create(self, dataset_id: str, fingerprint: str, plan: dict[str, Any]) -> dict[str, Any]:
+        workflow_id = str(uuid4())
+        now = self._now()
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "INSERT INTO agent_workflows(id,dataset_id,fingerprint,status,step,retry_count,plan_json,evidence_json,result_json,error_type,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (workflow_id, dataset_id, fingerprint, "RUNNING", "PLANNING", 0, json.dumps(plan), "{}", "{}", None, now, now),
+            )
+            db.commit()
+        return self.get(workflow_id)  # type: ignore[return-value]
+
+    def get(self, workflow_id: str) -> dict[str, Any] | None:
+        with sqlite3.connect(self.path) as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute("SELECT * FROM agent_workflows WHERE id=?", (workflow_id,)).fetchone()
+        if not row:
+            return None
+        payload = dict(row)
+        for key in ("plan_json", "evidence_json", "result_json"):
+            try:
+                payload[key.removesuffix("_json")] = json.loads(payload.pop(key))
+            except (TypeError, json.JSONDecodeError):
+                payload[key.removesuffix("_json")] = {}
+        return payload
+
+    def transition(self, workflow_id: str, next_step: str, *, evidence: dict[str, Any] | None = None, result: dict[str, Any] | None = None) -> dict[str, Any]:
+        if next_step not in STEPS:
+            raise WorkflowStateError("Unsupported workflow step.")
+        current = self.get(workflow_id)
+        if current is None:
+            raise WorkflowStateError("Workflow not found.")
+        allowed = {"PLANNING": {"EXECUTION", "FAILED"}, "EXECUTION": {"SYNTHESIS", "FAILED"}, "SYNTHESIS": {"COMPLETED", "FAILED"}, "COMPLETED": set(), "FAILED": set()}
+        if next_step not in allowed[current["step"]]:
+            raise WorkflowStateError("Invalid workflow transition.")
+        status = "COMPLETED" if next_step == "COMPLETED" else ("FAILED" if next_step == "FAILED" else "RUNNING")
+        now = self._now()
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE agent_workflows SET status=?,step=?,evidence_json=?,result_json=?,updated_at=? WHERE id=?", (status, next_step, json.dumps(evidence or current.get("evidence", {})), json.dumps(result or current.get("result", {})), now, workflow_id))
+            db.commit()
+        return self.get(workflow_id)  # type: ignore[return-value]
+
+    def fail(self, workflow_id: str, error_type: str, *, retryable: bool = True) -> dict[str, Any]:
+        current = self.get(workflow_id)
+        if current is None:
+            raise WorkflowStateError("Workflow not found.")
+        if current["status"] == "COMPLETED":
+            raise WorkflowStateError("Completed workflows cannot be retried.")
+        if retryable and current["retry_count"] < self.max_retries:
+            now = self._now()
+            with sqlite3.connect(self.path) as db:
+                db.execute("UPDATE agent_workflows SET retry_count=retry_count+1,error_type=?,status='RUNNING',updated_at=? WHERE id=?", (str(error_type).split(".")[-1][:100], now, workflow_id))
+                db.commit()
+            return self.get(workflow_id)  # type: ignore[return-value]
+        now = self._now()
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE agent_workflows SET status='FAILED',step='FAILED',error_type=?,updated_at=? WHERE id=?", (str(error_type).split(".")[-1][:100], now, workflow_id))
+            db.commit()
+        return self.get(workflow_id)  # type: ignore[return-value]
+
+    def recoverable(self, workflow_id: str) -> dict[str, Any] | None:
+        workflow = self.get(workflow_id)
+        if workflow is None or workflow["status"] != "RUNNING":
+            return None
+        return workflow
+
+    def run_step(self, workflow_id: str, handler: Callable[[dict[str, Any]], dict[str, Any]]) -> dict[str, Any]:
+        """Run the current step once; callers decide whether to schedule another attempt."""
+        workflow = self.recoverable(workflow_id)
+        if workflow is None:
+            raise WorkflowStateError("Workflow is not recoverable.")
+        try:
+            output = handler(workflow)
+            next_step = {"PLANNING": "EXECUTION", "EXECUTION": "SYNTHESIS", "SYNTHESIS": "COMPLETED"}[workflow["step"]]
+            return self.transition(workflow_id, next_step, evidence=output if workflow["step"] == "EXECUTION" else None, result=output if next_step == "COMPLETED" else None)
+        except Exception as error:
+            return self.fail(workflow_id, type(error).__name__)
