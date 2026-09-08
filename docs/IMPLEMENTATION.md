@@ -57,7 +57,7 @@
 - [x] Dataset/schema/model provenance fields exposed by the API.
 - [x] Spark execution exposes explainability metadata and explicit limitations where grouped attribution is unavailable.
 - [ ] SHAP integration for supported models.
-- [ ] Persistent explanation artifacts.
+- [x] Persistent explanation artifacts for successful runs, bounded and lineage-scoped in SQLite.
 
 ## Phase 7 — Agent orchestration
 - [x] Tool/interface contracts documented.
@@ -81,6 +81,7 @@
 - [x] Analytics dashboard tables.
 - [x] Model comparison and explanation presentation.
 - [x] SQLite-backed analytical run history.
+- [x] Persistent bounded explanation artifacts associated with successful analytical runs.
 - [x] JSON and standalone HTML report exports.
 - [x] Dataset list/manifest APIs.
 - [x] Restart-recoverable dataset/profile/schema state when local data storage persists.
@@ -101,6 +102,6 @@
 A phase is complete only when implementation, tests, documentation, and known limitations agree. New functionality is intentionally marked as implemented but not as empirically validated until the dedicated evaluation protocol has been executed.
 
 ## Current status
-The product now spans upload, deterministic data health, canonical schema confirmation, heterogeneous task detection, descriptive analytics, bounded supervised ML comparison with mixed numeric/categorical predictors, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering/anomaly screening, explainability evidence, persistent dataset/profile/schema state, persistent run history, reproducible JSON/HTML reporting, and bounded evidence-to-action synthesis in one workflow.
+The product now spans upload, deterministic data health, canonical HR schema confirmation, heterogeneous task detection, descriptive analytics, bounded supervised ML comparison with mixed numeric/categorical predictors, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering/anomaly screening, explainability evidence, bounded persistent explanation artifacts, persistent dataset/profile/schema state, persistent run history, reproducible JSON/HTML reporting, and bounded evidence-to-action synthesis in one workflow.
 
 The remaining research-critical work is primarily **evaluation rather than adding unchecked features**: execute the robustness/scalability protocol, quantify schema-mapping and feasibility reliability, test planner-to-synthesis abstention/failure behavior, and document the observed trade-offs. The broad product concept is not claimed as novel; the proposed contribution must be supported by measured results.
