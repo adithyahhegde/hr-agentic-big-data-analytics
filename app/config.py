@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 
-@dataclass(frozen=True)
+@dataclass
 class Settings:
     app_name: str = "HR Agentic Analytics"
     max_upload_bytes: int = 10 * 1024 * 1024
