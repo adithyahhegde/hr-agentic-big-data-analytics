@@ -30,9 +30,10 @@ python scripts/benchmark.py --matrix --seed 42 --output benchmark-matrix.json
 python scripts/feasibility_evaluation.py --sizes 10 20 100 --seed 42 --output feasibility.json
 python scripts/schema_mapping_evaluation.py --sizes 20 100 --seed 42 --output schema-mapping.json
 python scripts/agent_reliability_evaluation.py --seed 42 --output agent-reliability.json
+python scripts/scalability_evaluation.py --sizes 100 1000 10000 --seed 42 --repeats 1 --output scalability.json
 ```
 
-A GitHub Actions evaluation workflow at `.github/workflows/evaluation.yml` executes the feasibility protocol and benchmark matrix on relevant `main` changes and manual dispatch. It uploads the generated JSON outputs as a 30-day workflow artifact and fails if the deterministic fixture-contract assertions do not hold. This creates an executable validation path; it does not substitute for target-environment Spark scalability measurements.
+A GitHub Actions evaluation workflow at `.github/workflows/evaluation.yml` executes the feasibility protocol, comparative mapping, bounded-agent reliability, robustness benchmark matrix, and local scalability measurement on relevant `main` changes and manual dispatch. It uploads the generated JSON outputs as a 30-day workflow artifact and fails if the deterministic fixture-contract assertions do not hold. This creates an executable validation path; it does not substitute for target-environment Spark scalability measurements.
 
 The benchmark harness reports elapsed time, throughput, row/duplicate counts, selected routing engine, task-feasibility results, and aggregate consistency checks. It does not print or persist employee-level records. The matrix covers clean, renamed, categorical, mixed, missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy conditions plus deliberately invalid ambiguous/leakage-prone mappings. Invalid mapping scenarios are reported as `BLOCKED_COLLISION` and are not executed as if they were valid analytical inputs.
 
@@ -67,6 +68,8 @@ For synthetic datasets at increasing row counts, record:
 - selected execution engine
 - whether raw rows were collected to the driver
 
+`scripts/scalability_evaluation.py` now provides a bounded, reproducible local measurement protocol. It sorts and de-duplicates requested sizes, supports 1–5 timing repeats using the median elapsed time, records bytes/rows/throughput and elapsed-size multipliers, and makes no fixed performance assertion. Its timing scope is explicitly CSV fixture read plus deterministic descriptive analytics. CI executes 100, 1,000, and 10,000-row clean fixtures; these timings are environment-specific evidence rather than universal guarantees. External Spark-cluster measurements remain a separate target-environment requirement.
+
 Do not claim Spark is faster for every workload. The evaluation should identify the workload size at which distributed execution becomes operationally useful under the configured environment.
 
 ## Reproducibility
@@ -79,4 +82,4 @@ Report both successes and abstentions/failures. A useful evaluation should demon
 
 ## Current evidence status
 
-The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix, explicit schema-gate handling for ambiguous/leakage-prone mappings, and executable data-quality stress fixtures. Objective-feasibility, comparative schema-mapping, and bounded-agent reliability evaluation are executable protocols. No empirical accuracy or scalability claim is made here until workflow artifacts are inspected and, for Spark claims, the target environment has been measured. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
+The benchmark harness and deterministic fixture tests are implemented, including a reproducible size/scenario matrix, explicit schema-gate handling for ambiguous/leakage-prone mappings, and executable data-quality stress fixtures. Objective-feasibility, comparative schema-mapping, bounded-agent reliability, and local scalability evaluation are executable protocols. No empirical accuracy or scalability claim is made here until workflow artifacts are inspected and, for Spark claims, the target environment has been measured. Benchmark numbers are intentionally not hard-coded into the repository. They must be generated in the target runtime environment so hardware, Spark availability, and configuration are visible alongside the measurements.
