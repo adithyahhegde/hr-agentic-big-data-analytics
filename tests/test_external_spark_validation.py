@@ -40,7 +40,7 @@ def test_external_validation_strips_master_whitespace(monkeypatch):
         assert kwargs["master"] == "spark://example:7077"
         return {"row_count": 10, "execution": {"distributed": True, "raw_rows_returned": False}}
 
-    monkeypatch.setattr(external_validation, "analyze_spark", fake_analyze)
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     result = validate(rows=10, master="  spark://example:7077  ")
     assert result["validation"]["distributed"] is True
 
@@ -62,19 +62,22 @@ def test_external_validation_rejects_invalid_sizes(monkeypatch):
 def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
     calls = []
 
-    def fake_analyze(path, mappings, **kwargs):
-        rows = int(path.stem.split("-")[-1])
-        calls.append((rows, kwargs["master"]))
+    def fake_analyze(path_lines, mappings, **kwargs):
+        rows = len(path_lines) - 1
+        calls.append((rows, kwargs["master"], path_lines[0]))
         return {"row_count": rows, "execution": {"distributed": True, "raw_rows_returned": False}}
 
-    monkeypatch.setattr(external_validation, "analyze_spark", fake_analyze)
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     result = validate_sizes(sizes=[1000, 100, 1000], seed=42, master="spark://example:7077")
     assert result["protocol"] == "external_spark_scalability_v1"
     assert result["sizes"] == [100, 1000]
     assert [run["rows"] for run in result["runs"]] == [100, 1000]
     assert all(run["elapsed_seconds"] >= 0 for run in result["runs"])
     assert all(run["rows_per_second"] is not None and run["rows_per_second"] > 0 for run in result["runs"])
-    assert calls == [(100, "spark://example:7077"), (1000, "spark://example:7077")]
+    assert calls[0][0] == 100
+    assert calls[1][0] == 1000
+    assert all(call[1] == "spark://example:7077" for call in calls)
+    assert all(call[2].startswith("employee_id,") for call in calls)
 
 
 def test_external_validation_requires_distributed_and_non_raw_result(monkeypatch):
@@ -84,7 +87,7 @@ def test_external_validation_requires_distributed_and_non_raw_result(monkeypatch
             "execution": {"distributed": False, "raw_rows_returned": False},
         }
 
-    monkeypatch.setattr(external_validation, "analyze_spark", fake_analyze)
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     with pytest.raises(RuntimeError, match="distributed execution"):
         validate(rows=10, master="spark://example:7077")
 
@@ -96,7 +99,7 @@ def test_external_validation_rejects_raw_rows(monkeypatch):
             "execution": {"distributed": True, "raw_rows_returned": True},
         }
 
-    monkeypatch.setattr(external_validation, "analyze_spark", fake_analyze)
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     with pytest.raises(RuntimeError, match="must not return raw rows"):
         validate(rows=10, master="spark://example:7077")
 
@@ -109,7 +112,7 @@ def test_external_validation_returns_verified_contract(monkeypatch):
             "numeric_summary": {},
         }
 
-    monkeypatch.setattr(external_validation, "analyze_spark", fake_analyze)
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     result = validate(rows=10, seed=42, master="spark://example:7077")
     assert result["validation"]["distributed"] is True
     assert result["rows"] == 10
