@@ -24,7 +24,10 @@ class RunHistory:
         with sqlite3.connect(self.path) as db:
             cursor = db.execute("INSERT INTO runs(dataset_id,fingerprint,operation,engine,status,created_at,result_json) VALUES(?,?,?,?,?,?,?)", (dataset_id, fingerprint, operation, engine, status, datetime.now(timezone.utc).isoformat(), json.dumps(safe_result, default=str)))
             db.commit()
-            return int(cursor.lastrowid)
+            run_id = int(cursor.lastrowid)
+        if status == "SUCCEEDED" and isinstance(result.get("explainability"), dict):
+            self.record_explanation(run_id, dataset_id, fingerprint, operation, result["explainability"], result.get("schema_version"))
+        return run_id
 
     def record_failure(self, dataset_id: str, fingerprint: str, operation: str, error: Exception, engine: str | None = None) -> int:
         return self.record_failure_safe(dataset_id, fingerprint, operation, type(error).__name__, engine)
@@ -52,7 +55,9 @@ class RunHistory:
                     except (TypeError, ValueError):
                         continue
                 features.append(safe_item)
-        artifact = {"method": method, "top_features": features, "limitations": [str(value)[:300] for value in explanation.get("limitations", [])[:5]] if isinstance(explanation.get("limitations"), list) else []}
+        raw_limitations = explanation.get("limitations", [])
+        limitations = [str(value)[:300] for value in raw_limitations[:5]] if isinstance(raw_limitations, list) else []
+        artifact = {"method": method, "top_features": features, "limitations": limitations}
         created_at = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.path) as db:
             cursor = db.execute("INSERT OR REPLACE INTO explanation_artifacts(run_id,dataset_id,fingerprint,schema_version,operation,created_at,artifact_json) VALUES(?,?,?,?,?,?,?)", (run_id, dataset_id, fingerprint, schema_version, operation, created_at, json.dumps(artifact, default=str)))
