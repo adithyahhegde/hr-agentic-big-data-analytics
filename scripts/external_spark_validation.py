@@ -9,13 +9,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import tempfile
 import time
 from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlsplit
 
-from app.services.spark_analytics import analyze_spark
+from app.services.spark_analytics import analyze_spark_csv_lines
 
 try:
     from scripts.benchmark import MAPPINGS, make_fixture
@@ -84,28 +83,32 @@ def validate_sizes(
     """Measure the bounded descriptive path at multiple target-cluster sizes.
 
     Only aggregate results are retained. Each size gets a fresh deterministic
-    fixture and records wall-clock execution time and throughput. The endpoint
-    itself is never included in the returned evidence.
+    fixture. CSV content is transferred to the target Spark application through
+    an RDD so validation does not depend on executor access to a driver-local
+    temporary filesystem.
     """
     normalized_sizes = _validate_sizes(sizes)
     configured_master = _validate_external_master(master)
     runs: list[dict[str, Any]] = []
 
-    with tempfile.TemporaryDirectory(prefix="hr_external_spark_") as tmp:
-        for rows in normalized_sizes:
-            path = Path(tmp) / f"fixture-{rows}.csv"
-            make_fixture(path, rows, seed, "clean")
-            started = time.perf_counter()
-            result = analyze_spark(path, MAPPINGS, master=configured_master)
-            elapsed = time.perf_counter() - started
-            validation = _validate_result(result, rows)
-            runs.append({
-                "rows": rows,
-                "elapsed_seconds": round(elapsed, 6),
-                "rows_per_second": round(rows / elapsed, 3) if elapsed > 0 else None,
-                "result": result,
-                "validation": validation,
-            })
+    for rows in normalized_sizes:
+        path = Path(f"/tmp/hr_external_spark_fixture_{rows}.csv")
+        make_fixture(path, rows, seed, "clean")
+        started = time.perf_counter()
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+            result = analyze_spark_csv_lines(lines, MAPPINGS, master=configured_master)
+        finally:
+            path.unlink(missing_ok=True)
+        elapsed = time.perf_counter() - started
+        validation = _validate_result(result, rows)
+        runs.append({
+            "rows": rows,
+            "elapsed_seconds": round(elapsed, 6),
+            "rows_per_second": round(rows / elapsed, 3) if elapsed > 0 else None,
+            "result": result,
+            "validation": validation,
+        })
 
     return {
         "protocol": protocol,
