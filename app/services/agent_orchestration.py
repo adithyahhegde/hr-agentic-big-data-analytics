@@ -72,7 +72,7 @@ class AgentWorkflowStore:
         current = self.get(workflow_id)
         if current is None:
             raise WorkflowStateError("Workflow not found.")
-        allowed = {"PLANNING": {"EXECUTION", "FAILED"}, "EXECUTION": {"SYNTHESIS", "FAILED"}, "SYNTHESIS": {"CONFIRMATION", "COMPLETED", "FAILED"}, "CONFIRMATION": {"COMPLETED", "FAILED"}, "COMPLETED": set()}
+        allowed = {"PLANNING": {"EXECUTION", "FAILED"}, "EXECUTION": {"SYNTHESIS", "FAILED"}, "SYNTHESIS": {"CONFIRMATION", "COMPLETED", "FAILED"}, "CONFIRMATION": {"FAILED"}, "COMPLETED": set()}
         if next_step not in allowed[current["step"]]:
             raise WorkflowStateError("Invalid workflow transition.")
         status = "COMPLETED" if next_step == "COMPLETED" else ("FAILED" if next_step == "FAILED" else "RUNNING")
