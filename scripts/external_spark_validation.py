@@ -12,6 +12,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from app.services.spark_analytics import analyze_spark
 
@@ -21,14 +22,29 @@ except ModuleNotFoundError:  # Supports direct execution from the repository roo
     from benchmark import MAPPINGS, make_fixture
 
 
-def validate(*, rows: int = 10_000, seed: int = 42, master: str | None = None) -> dict[str, Any]:
-    if rows < 1:
-        raise ValueError("rows must be positive")
-    configured_master = master or os.getenv("HR_ANALYTICS_SPARK_MASTER")
+def _validate_external_master(master: str | None) -> str:
+    configured_master = (master or os.getenv("HR_ANALYTICS_SPARK_MASTER") or "").strip()
     if not configured_master:
         raise ValueError("HR_ANALYTICS_SPARK_MASTER must be set for external Spark validation")
     if configured_master.startswith("local"):
         raise ValueError("external Spark validation requires a non-local Spark master")
+    try:
+        parsed = urlsplit(configured_master)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError as error:
+        raise ValueError("external Spark validation requires a master like spark://host:7077") from error
+    if parsed.scheme != "spark" or not hostname or port is None:
+        raise ValueError("external Spark validation requires a master like spark://host:7077")
+    if hostname.lower() in {"localhost", "127.0.0.1", "::1"}:
+        raise ValueError("external Spark validation requires a non-loopback Spark master")
+    return configured_master
+
+
+def validate(*, rows: int = 10_000, seed: int = 42, master: str | None = None) -> dict[str, Any]:
+    if rows < 1:
+        raise ValueError("rows must be positive")
+    configured_master = _validate_external_master(master)
 
     with tempfile.TemporaryDirectory(prefix="hr_external_spark_") as tmp:
         path = Path(tmp) / "fixture.csv"

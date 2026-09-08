@@ -36,7 +36,7 @@ HR_ANALYTICS_SPARK_MASTER=spark://host:7077 python scripts/external_spark_valida
 
 The GitHub Actions evaluation workflow at `.github/workflows/evaluation.yml` executes feasibility, comparative mapping, bounded-agent reliability, robustness, local scalability, and SHAP smoke evaluation on relevant `main` changes and manual dispatch. It uploads JSON outputs as a 30-day artifact and fails on deterministic fixture-contract violations. This does not substitute for target-environment Spark measurements.
 
-The external Spark protocol at `scripts/external_spark_validation.py` is opt-in and requires an explicit non-local `HR_ANALYTICS_SPARK_MASTER`. It validates a clean fixture's distributed descriptive path without collecting raw rows. The repository does not claim external-cluster results until this command is executed against a reachable target cluster and its output is retained as evaluation evidence.
+The external Spark protocol at `scripts/external_spark_validation.py` is opt-in and requires an explicit `spark://host:port` master whose hostname is non-loopback. It rejects local masters, localhost/loopback endpoints, malformed URLs, and blank values before attempting a cluster connection. It validates a clean fixture's distributed descriptive path without collecting raw rows. The repository does not claim external-cluster results until this command is executed against a reachable target cluster and its output is retained as evaluation evidence.
 
 ## Functional metrics
 

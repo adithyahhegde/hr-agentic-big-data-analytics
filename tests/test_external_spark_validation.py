@@ -17,6 +17,28 @@ def test_external_validation_rejects_local_master():
         validate(rows=10, master="local[*]")
 
 
+@pytest.mark.parametrize("master", ["spark://localhost:7077", "spark://127.0.0.1:7077", "spark://[::1]:7077"])
+def test_external_validation_rejects_loopback_master(master):
+    with pytest.raises(ValueError, match="non-loopback Spark master"):
+        validate(rows=10, master=master)
+
+
+@pytest.mark.parametrize("master", ["", "spark://example", "http://example:7077", "spark://example:not-a-port"])
+def test_external_validation_rejects_malformed_master(master):
+    with pytest.raises(ValueError, match="spark://host:7077"):
+        validate(rows=10, master=master)
+
+
+def test_external_validation_strips_master_whitespace(monkeypatch):
+    def fake_analyze(*args, **kwargs):
+        assert kwargs["master"] == "spark://example:7077"
+        return {"row_count": 10, "execution": {"distributed": True, "raw_rows_returned": False}}
+
+    monkeypatch.setattr(external_validation, "analyze_spark", fake_analyze)
+    result = validate(rows=10, master="  spark://example:7077  ")
+    assert result["validation"]["distributed"] is True
+
+
 def test_external_validation_protocol_has_bounded_defaults():
     import inspect
 

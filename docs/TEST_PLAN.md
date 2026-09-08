@@ -17,6 +17,7 @@
 - Schema acceptance rejects duplicate canonical-field assignments and returns explained preliminary capability decisions.
 - Data Quality Engine tests verify deterministic numeric profiling (min, max, mean, zero/negative counts), sampled PII/sensitive pattern signals (email, phone, SSN) with explicit non-guarantee semantics, configurable domain validations (negative compensation, out-of-range age, tenure outliers), duplicate identifiers, completeness gates (>20%, >80%), empty row detection, single-row handling, all-null columns, and composite dataset health scoring (0-100).
 - Canonical HR Schema Engine (M2) tests verify 35-field canonical ontology integrity, deterministic camelCase/punctuation name normalization, order-invariant SHA-256 dataset fingerprinting, multi-signal evidence scoring (name, type, value, profile), explicit mapping policy (`AUTO_MAPPED`, `NEEDS_REVIEW`, `UNMAPPED`), alternative candidate tracking on ambiguity, collision detection and downgrading, unmapped field preservation, schema versioning (`2.0.0`), and strict determinism across repeated executions.
+- External Spark validation tests require a strict `spark://host:7077`-style non-local master and reject local, loopback, malformed, or whitespace-only endpoints before attempting cluster execution.
 
 
 
