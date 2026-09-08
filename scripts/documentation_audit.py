@@ -45,12 +45,14 @@ FORBIDDEN_STALE_MARKERS = (
 
 def audit(root: Path) -> list[str]:
     errors: list[str] = []
+    texts: dict[str, str] = {}
     for relative in REQUIRED_FILES:
         path = root / relative
         if not path.is_file():
             errors.append(f"missing required documentation: {relative}")
             continue
         text = path.read_text(encoding="utf-8")
+        texts[relative] = text
         for marker in REQUIRED_MARKERS.get(relative, ()):
             if marker not in text:
                 errors.append(f"{relative}: missing current-status marker: {marker}")
@@ -60,11 +62,13 @@ def audit(root: Path) -> list[str]:
 
     implementation = root / "docs/IMPLEMENTATION.md"
     if implementation.is_file():
-        text = implementation.read_text(encoding="utf-8")
+        text = texts.get("docs/IMPLEMENTATION.md", implementation.read_text(encoding="utf-8"))
         if "## Definition of done" not in text:
             errors.append("docs/IMPLEMENTATION.md: missing Definition of done section")
         if "## Current status" not in text:
             errors.append("docs/IMPLEMENTATION.md: missing Current status section")
+        if "[ ] Documentation consistency audit after final feature freeze." in text:
+            errors.append("docs/IMPLEMENTATION.md: stale status marker: documentation consistency audit remains unchecked")
 
     return errors
 
