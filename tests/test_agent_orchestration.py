@@ -69,3 +69,47 @@ def test_run_step_retries_without_exposing_exception_message(tmp_path):
     assert failed_attempt["error_type"] == "RuntimeError"
     assert "salary" not in str(failed_attempt)
     assert "/secret/path" not in str(failed_attempt)
+
+
+def test_confirmation_gate_survives_restart_and_requires_explicit_approval(tmp_path):
+    path = tmp_path / "state.sqlite3"
+    store = AgentWorkflowStore(path)
+    workflow_id = store.create("d1", "fp1", {})["id"]
+    store.transition(workflow_id, "EXECUTION")
+    store.transition(workflow_id, "SYNTHESIS")
+
+    waiting = store.request_confirmation(workflow_id, [{"action": "send compensation change", "evidence_ids": ["ev1"]}])
+    assert waiting["status"] == "WAITING_CONFIRMATION"
+    assert waiting["step"] == "CONFIRMATION"
+    assert waiting["confirmation"]["actions"][0]["evidence_ids"] == ["ev1"]
+
+    reopened = AgentWorkflowStore(path)
+    assert reopened.recoverable(workflow_id) is None
+    still_waiting = reopened.get(workflow_id)
+    assert still_waiting["status"] == "WAITING_CONFIRMATION"
+
+    try:
+        reopened.transition(workflow_id, "COMPLETED")
+        raise AssertionError("expected confirmation gate")
+    except WorkflowStateError:
+        pass
+
+    denied = reopened.confirm(workflow_id, approved=False)
+    assert denied["status"] == "FAILED"
+    assert denied["error_type"] == "HumanConfirmationDenied"
+
+
+def test_confirmation_approval_completes_workflow_and_sanitizes_actions(tmp_path):
+    store = AgentWorkflowStore(tmp_path / "state.sqlite3")
+    workflow_id = store.create("d1", "fp1", {})["id"]
+    store.transition(workflow_id, "EXECUTION")
+    store.transition(workflow_id, "SYNTHESIS")
+
+    waiting = store.request_confirmation(workflow_id, [{"action": "A" * 1000, "evidence_ids": [str(i) for i in range(100)]}])
+    assert len(waiting["confirmation"]["actions"][0]["action"]) == 500
+    assert len(waiting["confirmation"]["actions"][0]["evidence_ids"]) == 20
+
+    completed = store.confirm(workflow_id, approved=True)
+    assert completed["status"] == "COMPLETED"
+    assert completed["step"] == "COMPLETED"
+    assert completed["confirmation"]["approved"] is True
