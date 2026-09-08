@@ -90,11 +90,11 @@
 - [x] Benchmark fixture generator.
 - [x] Benchmark harness with local/Spark optional comparison and consistency checks.
 - [x] Regression tests for routing, profiling, data quality, persistence, provenance, bounded synthesis, reports, and benchmark behavior.
-- [ ] Full robustness matrix across clean/messy/ambiguous/categorical/mixed datasets.
+- [x] Expanded robustness fixture matrix including missing-heavy, duplicate-heavy, high-cardinality, and outlier-heavy data plus ambiguous/leakage-prone schema gates.
 - [ ] Scalability measurements at multiple dataset sizes.
-- [ ] Comparative schema-mapping evaluation against baseline methods.
+- [x] Comparative schema-mapping evaluation against baseline methods as an executable protocol (empirical execution still outstanding).
 - [x] Executable objective-feasibility evaluation protocol against explicit fixture-contract labels and a weak baseline (empirical execution still outstanding).
-- [ ] End-to-end agent reliability/abstention evaluation.
+- [x] Executable bounded planner-to-synthesis reliability/abstention evaluation protocol (empirical execution still outstanding).
 - [ ] Documentation consistency audit after final feature freeze.
 
 ## Definition of done
@@ -103,4 +103,4 @@ A phase is complete only when implementation, tests, documentation, and known li
 ## Current status
 The product now spans upload, deterministic data health, canonical schema confirmation, heterogeneous task detection, descriptive analytics, bounded supervised ML comparison with mixed numeric/categorical predictors, local unsupervised analysis, routed Spark supervised ML, distributed Spark clustering/anomaly screening, explainability evidence, persistent dataset/profile/schema state, persistent run history, reproducible JSON/HTML reporting, and bounded evidence-to-action synthesis in one workflow.
 
-The remaining research-critical work is primarily **evaluation rather than adding unchecked features**: execute the robustness/scalability protocol, quantify schema-mapping and feasibility reliability, test abstention/failure behavior, and document the observed trade-offs. The broad product concept is not claimed as novel; the proposed contribution must be supported by measured results.
+The remaining research-critical work is primarily **evaluation rather than adding unchecked features**: execute the robustness/scalability protocol, quantify schema-mapping and feasibility reliability, test planner-to-synthesis abstention/failure behavior, and document the observed trade-offs. The broad product concept is not claimed as novel; the proposed contribution must be supported by measured results.
