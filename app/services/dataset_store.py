@@ -53,6 +53,7 @@ class DatasetStore:
             return dataset
         except Exception:
             path.unlink(missing_ok=True)
+            self._datasets.pop(dataset_id, None)
             raise
 
     @staticmethod
@@ -70,12 +71,14 @@ class DatasetStore:
             raise ValueError("The CSV could not be parsed. Check delimiters and quoting.") from exc
 
     def get(self, dataset_id: str) -> StoredDataset | None:
-        dataset = self._datasets.get(dataset_id)
-        if dataset:
-            return dataset
+        # Always consult the durable owner-filtered registry, even for cached
+        # objects. The process-local cache must never bypass tenant isolation.
         manifest = registry.get(dataset_id)
         if not manifest:
             return None
+        dataset = self._datasets.get(dataset_id)
+        if dataset and dataset.sha256 == manifest["fingerprint"] and dataset.path.exists():
+            return dataset
         path = Path(manifest["path"])
         if not path.exists():
             return None
