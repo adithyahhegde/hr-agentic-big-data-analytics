@@ -54,3 +54,16 @@ def test_dataset_registry_isolates_owners(tmp_path):
             registry.register(dataset)
     finally:
         reset_current_user(bob_token)
+
+
+def test_process_local_dataset_cache_cannot_bypass_owner_filter(monkeypatch, tmp_path):
+    import app.services.dataset_store as dataset_store_module
+
+    class RegistryStub:
+        def get(self, dataset_id):
+            return None
+
+    monkeypatch.setattr(dataset_store_module, "registry", RegistryStub())
+    store = dataset_store_module.DatasetStore()
+    store._datasets["dataset-1"] = SimpleNamespace(dataset_id="dataset-1", sha256="fp", path=tmp_path / "cached.csv")
+    assert store.get("dataset-1") is None
