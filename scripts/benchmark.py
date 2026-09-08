@@ -66,12 +66,16 @@ def make_fixture(path: Path, rows: int, seed: int, scenario: str = "clean") -> N
     path.parent.mkdir(parents=True, exist_ok=True)
     mappings = SCHEMA_SCENARIOS[scenario]
     headers = tuple(mappings)
+    duplicate_cache: dict[int, dict[str, Any]] = {}
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         writer.writerow(headers)
         for i in range(1, rows + 1):
             source_i = ((i - 1) % max(1, rows // 5)) + 1 if scenario == "duplicate_heavy" else i
-            values = _values(rng, source_i, scenario)
+            if scenario == "duplicate_heavy":
+                values = duplicate_cache.setdefault(source_i, _values(rng, source_i, scenario))
+            else:
+                values = _values(rng, source_i, scenario)
             writer.writerow(tuple(values[canonical] for canonical in mappings.values()))
 
 
