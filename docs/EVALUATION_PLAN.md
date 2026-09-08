@@ -31,12 +31,12 @@ python scripts/feasibility_evaluation.py --sizes 10 20 100 --seed 42 --output fe
 python scripts/schema_mapping_evaluation.py --sizes 20 100 --seed 42 --output schema-mapping.json
 python scripts/agent_reliability_evaluation.py --seed 42 --output agent-reliability.json
 python scripts/scalability_evaluation.py --sizes 100 1000 10000 --seed 42 --repeats 1 --output scalability.json
-HR_ANALYTICS_SPARK_MASTER=spark://host:7077 python scripts/external_spark_validation.py --rows 10000 --seed 42 --output external-spark.json
+HR_ANALYTICS_SPARK_MASTER=spark://host:7077 python scripts/external_spark_validation.py --sizes 100 1000 10000 --seed 42 --output external-spark.json
 ```
 
-The GitHub Actions evaluation workflow at `.github/workflows/evaluation.yml` executes feasibility, comparative mapping, bounded-agent reliability, robustness, local scalability, and SHAP smoke evaluation on relevant `main` changes and manual dispatch. It uploads JSON outputs as a 30-day artifact and fails on deterministic fixture-contract violations. This does not substitute for target-environment Spark measurements.
+The GitHub Actions evaluation workflow at `.github/workflows/evaluation.yml` executes feasibility, comparative mapping, bounded-agent reliability, robustness, local scalability, and SHAP smoke evaluation on relevant `main` changes and manual dispatch. When the `HR_ANALYTICS_SPARK_MASTER` secret is configured with a reachable non-loopback Spark master, it additionally runs the external Spark protocol at 100, 1,000, and 10,000 rows. It uploads JSON outputs as a 30-day artifact and fails on deterministic fixture-contract violations. A skipped external step is not scalability evidence.
 
-The external Spark protocol at `scripts/external_spark_validation.py` is opt-in and requires an explicit `spark://host:port` master whose hostname is non-loopback. It rejects local masters, localhost/loopback endpoints, malformed URLs, and blank values before attempting a cluster connection. It validates a clean fixture's distributed descriptive path without collecting raw rows. The repository does not claim external-cluster results until this command is executed against a reachable target cluster and its output is retained as evaluation evidence.
+The external Spark protocol at `scripts/external_spark_validation.py` is opt-in and requires an explicit `spark://host:port` master whose hostname is non-loopback. It rejects local masters, localhost/loopback endpoints, malformed URLs, and blank values before attempting a cluster connection. It validates the clean fixture's distributed descriptive path at multiple increasing sizes, records wall-clock time and rows/second for each size, and never collects raw rows. The repository does not claim external-cluster results until this command is executed against a reachable target cluster and its output is retained as evaluation evidence.
 
 ## Functional metrics
 
@@ -59,6 +59,8 @@ The objective-feasibility runner is an executable protocol whose fixture labels 
 
 For increasing synthetic sizes, record ingestion time, analytics wall-clock time, ML wall-clock time where applicable, rows/second, peak memory where measurable, selected engine, and whether raw rows were collected to the driver. `scripts/scalability_evaluation.py` provides bounded local measurement with sorted/de-duplicated sizes and 1–5 median timing repeats. CI measures 100, 1,000, and 10,000-row clean fixtures. These timings are environment-specific evidence, not universal guarantees.
 
+The external Spark protocol now uses the same 100, 1,000, and 10,000-row scale points by default. Each run records aggregate-only results, elapsed wall-clock time, throughput, distributed execution status, and row-count integrity. The protocol intentionally does not interpret one target cluster's timings as universal performance claims; cluster size, worker resources, Spark version, network, storage, and scheduling conditions must accompany any reported result.
+
 The successful CI run for commit `c86e337b1ca1a6dcfbf6a8f92f1963fce33c586d` (run `34212312393`, 2026-09-08) measured `0.001977s`, `0.010824s`, and `0.110283s` for 100, 1,000, and 10,000 rows respectively, with `50,584`, `92,391`, and `90,676` rows/second. The 100-row timing is small and noisy; the single-repeat 100× size increase produced a `55.783×` elapsed-time increase. These measurements document the CI environment only and must not be used as universal performance guarantees.
 
 Do not claim Spark is faster for every workload. The evaluation should identify the workload size at which distributed execution becomes operationally useful under the configured environment.
@@ -78,4 +80,4 @@ The reproducible evaluation workflow has now been executed successfully on commi
 - local scalability measurements at 100, 1,000, and 10,000 rows;
 - a passing optional SHAP smoke-test step.
 
-Detailed observed values and limitations are recorded in `docs/EVALUATION_RESULTS.md`. The evidence is deterministic fixture/CI evidence, not real-world validation. External Spark target-cluster execution remains outstanding.
+Detailed observed values and limitations are recorded in `docs/EVALUATION_RESULTS.md`. The evidence is deterministic fixture/CI evidence, not real-world validation. External Spark target-cluster execution remains outstanding until a reachable non-loopback target is actually exercised.
