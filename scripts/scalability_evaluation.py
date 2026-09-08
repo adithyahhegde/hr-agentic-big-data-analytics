@@ -10,7 +10,11 @@ from pathlib import Path
 from typing import Any
 
 from app.services.analytics import analyze_csv
-from scripts.benchmark import make_fixture, MAPPINGS
+
+try:
+    from scripts.benchmark import make_fixture, MAPPINGS
+except ModuleNotFoundError:  # Supports direct execution: `python scripts/scalability_evaluation.py ...`.
+    from benchmark import make_fixture, MAPPINGS
 
 DEFAULT_SIZES = (100, 1_000, 10_000)
 
