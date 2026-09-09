@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import tempfile
 import time
@@ -27,6 +28,8 @@ except ModuleNotFoundError:  # Supports direct execution from the repository roo
 
 DEFAULT_SIZES = (100, 1_000, 10_000)
 PROTOCOL_VERSION = "external_spark_scalability_v2"
+NUMERIC_ABS_TOLERANCE = 1e-9
+NUMERIC_REL_TOLERANCE = 1e-6
 
 
 def _validate_external_master(master: str | None) -> str:
@@ -81,6 +84,24 @@ def _aggregate_signature(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _aggregate_values_match(actual: Any, expected: Any) -> bool:
+    """Compare aggregate payloads while allowing harmless floating-point drift."""
+    if isinstance(actual, dict) and isinstance(expected, dict):
+        return actual.keys() == expected.keys() and all(
+            _aggregate_values_match(actual[key], expected[key]) for key in expected
+        )
+    if isinstance(actual, list) and isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            _aggregate_values_match(actual_item, expected_item)
+            for actual_item, expected_item in zip(actual, expected)
+        )
+    if isinstance(actual, float) or isinstance(expected, float):
+        if actual is None or expected is None:
+            return actual is expected
+        return math.isclose(float(actual), float(expected), rel_tol=NUMERIC_REL_TOLERANCE, abs_tol=NUMERIC_ABS_TOLERANCE)
+    return actual == expected
+
+
 def _validate_result(
     result: dict[str, Any],
     rows: int,
@@ -100,7 +121,7 @@ def _validate_result(
         raise RuntimeError("external Spark validation must not return raw rows")
     if expected_aggregates is not None:
         actual = _aggregate_signature(result)
-        validation["aggregates_match_local_baseline"] = actual == expected_aggregates
+        validation["aggregates_match_local_baseline"] = _aggregate_values_match(actual, expected_aggregates)
         if not validation["aggregates_match_local_baseline"]:
             raise RuntimeError("external Spark aggregates differ from the deterministic local baseline")
     return validation
