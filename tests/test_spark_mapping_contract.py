@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from app.services.spark_analytics import _canonicalize_dataframe, _number_columns, _spark_session
@@ -97,11 +99,10 @@ class FakeBuilder:
 
 def test_spark_session_applies_remote_driver_network_configuration(monkeypatch):
     builder = FakeBuilder()
+    fake_spark_session = type("FakeSparkSession", (), {"builder": builder})
+    fake_sql = type("FakeSql", (), {"SparkSession": fake_spark_session})
 
-    class FakeSparkSession:
-        builder = builder
-
-    monkeypatch.setitem(__import__("sys").modules, "pyspark.sql", type("FakeSql", (), {"SparkSession": FakeSparkSession}))
+    monkeypatch.setitem(sys.modules, "pyspark.sql", fake_sql)
     monkeypatch.setenv("HR_ANALYTICS_SPARK_DRIVER_HOST", "host.docker.internal")
     monkeypatch.setenv("HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS", "0.0.0.0")
 
