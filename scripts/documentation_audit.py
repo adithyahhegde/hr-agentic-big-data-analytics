@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 
@@ -15,7 +16,7 @@ REQUIRED_FILES = (
 
 REQUIRED_MARKERS = {
     "README.md": (
-        "A successful CI evaluation run on 2026-09-08",
+        "A successful CI evaluation run on 2026-09-09",
         "External Spark target-cluster scalability has not yet been measured.",
         "application-level API-key identities scope",
     ),
@@ -29,7 +30,7 @@ REQUIRED_MARKERS = {
         "[x] Documentation consistency audit after final feature freeze.",
     ),
     "docs/EVALUATION_RESULTS.md": (
-        "GitHub Actions run `34212312393`",
+        "The reproducible evaluation workflow completed successfully on 2026-09-09 UTC",
         "External Spark scalability remains unverified",
         "do not establish generalization to real-world heterogeneous HR schemas",
     ),
@@ -59,6 +60,13 @@ def audit(root: Path) -> list[str]:
         for marker in FORBIDDEN_STALE_MARKERS:
             if marker in text:
                 errors.append(f"{relative}: stale status marker: {marker}")
+
+    results = texts.get("docs/EVALUATION_RESULTS.md", "")
+    run_matches = re.findall(r"GitHub Actions run `(\d+)`", results)
+    if not run_matches:
+        errors.append("docs/EVALUATION_RESULTS.md: missing GitHub Actions run identifier")
+    elif "34212312393" in run_matches:
+        errors.append("docs/EVALUATION_RESULTS.md: stale evaluation run identifier")
 
     implementation = root / "docs/IMPLEMENTATION.md"
     if implementation.is_file():
