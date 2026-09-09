@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlsplit
 
+from app.services.analytics import analyze_csv
 from app.services.spark_analytics import analyze_spark_csv_lines
 
 try:
@@ -54,9 +55,39 @@ def _validate_sizes(sizes: Sequence[int]) -> list[int]:
     return normalized
 
 
-def _validate_result(result: dict[str, Any], rows: int) -> dict[str, bool]:
+def _aggregate_signature(result: dict[str, Any]) -> dict[str, Any]:
+    """Keep only deterministic aggregate fields needed for local/Spark comparison."""
+    numeric = []
+    for item in result.get("numeric_summary", []):
+        numeric.append({key: item.get(key) for key in ("field", "count", "min", "max", "mean")})
+    categorical = []
+    for item in result.get("categorical_summary", []):
+        top_values = sorted(
+            ({"value": value.get("value"), "count": value.get("count"), "share": value.get("share")} for value in item.get("top_values", [])),
+            key=lambda value: (str(value["value"]), value["count"] or 0),
+        )
+        categorical.append({
+            "field": item.get("field"),
+            "count": item.get("count"),
+            "distinct": item.get("distinct"),
+            "top_values": top_values,
+        })
+    return {
+        "row_count": result.get("row_count"),
+        "duplicate_row_count": result.get("duplicate_row_count"),
+        "numeric_summary": sorted(numeric, key=lambda item: item["field"] or ""),
+        "categorical_summary": sorted(categorical, key=lambda item: item["field"] or ""),
+        "missing_by_field": sorted(result.get("missing_by_field", []), key=lambda item: item.get("field", "")),
+    }
+
+
+def _validate_result(
+    result: dict[str, Any],
+    rows: int,
+    expected_aggregates: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     execution = result.get("execution", {})
-    validation = {
+    validation: dict[str, Any] = {
         "row_count_matches_fixture": result.get("row_count") == rows,
         "raw_rows_returned": execution.get("raw_rows_returned"),
         "distributed": execution.get("distributed"),
@@ -67,6 +98,11 @@ def _validate_result(result: dict[str, Any], rows: int) -> dict[str, bool]:
         raise RuntimeError("configured non-local Spark master did not report distributed execution")
     if validation["raw_rows_returned"] is not False:
         raise RuntimeError("external Spark validation must not return raw rows")
+    if expected_aggregates is not None:
+        actual = _aggregate_signature(result)
+        validation["aggregates_match_local_baseline"] = actual == expected_aggregates
+        if not validation["aggregates_match_local_baseline"]:
+            raise RuntimeError("external Spark aggregates differ from the deterministic local baseline")
     return validation
 
 
@@ -104,6 +140,7 @@ def validate_sizes(
             fixture_bytes = path.read_bytes()
             fixture_sha256 = hashlib.sha256(fixture_bytes).hexdigest()
             fixture_schema = list(path.read_text(encoding="utf-8").splitlines()[0].split(","))
+            expected_aggregates = _aggregate_signature(analyze_csv(path, MAPPINGS))
             started = time.perf_counter()
             lines = fixture_bytes.decode("utf-8").splitlines()
             result = analyze_spark_csv_lines(
@@ -113,7 +150,7 @@ def validate_sizes(
                 stop_session=True,
             )
             elapsed = time.perf_counter() - started
-            validation = _validate_result(result, rows)
+            validation = _validate_result(result, rows, expected_aggregates)
             runs.append({
                 "rows": rows,
                 "fixture_sha256": fixture_sha256,

@@ -158,3 +158,53 @@ def test_external_validation_returns_verified_contract(monkeypatch):
     assert result["rows"] == 10
     assert result["elapsed_seconds"] >= 0
     assert result["rows_per_second"] > 0
+
+
+def test_external_validation_rejects_aggregate_mismatch(monkeypatch):
+    def fake_analyze(path_lines, mappings, **kwargs):
+        rows = len(path_lines) - 1
+        return {
+            "row_count": rows,
+            "duplicate_row_count": 0,
+            "numeric_summary": [],
+            "categorical_summary": [],
+            "missing_by_field": [],
+            "execution": {"distributed": True, "raw_rows_returned": False},
+        }
+
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
+    with pytest.raises(RuntimeError, match="aggregates differ"):
+        validate(rows=10, seed=42, master="spark://example:7077")
+
+
+def test_external_validation_accepts_matching_aggregate_baseline(monkeypatch):
+    def fake_analyze(path_lines, mappings, **kwargs):
+        from app.services.analytics import analyze_csv
+        path = kwargs.pop("_fixture_path")
+        expected = external_validation._aggregate_signature(analyze_csv(path, mappings))
+        return {
+            **expected,
+            "execution": {"distributed": True, "raw_rows_returned": False},
+        }
+
+    original = external_validation.analyze_spark_csv_lines
+
+    def fake_with_path(lines, mappings, **kwargs):
+        rows = len(lines) - 1
+        return {"row_count": rows, "duplicate_row_count": 0, "numeric_summary": [], "categorical_summary": [], "missing_by_field": [], "execution": {"distributed": True, "raw_rows_returned": False}}
+
+    # The contract is exercised directly because the Spark dependency is optional in unit CI.
+    result = external_validation._validate_result(
+        {
+            "row_count": 1,
+            "duplicate_row_count": 0,
+            "numeric_summary": [],
+            "categorical_summary": [],
+            "missing_by_field": [],
+            "execution": {"distributed": True, "raw_rows_returned": False},
+        },
+        1,
+        {"row_count": 1, "duplicate_row_count": 0, "numeric_summary": [], "categorical_summary": [], "missing_by_field": []},
+    )
+    assert result["aggregates_match_local_baseline"] is True
+    assert original is not None
