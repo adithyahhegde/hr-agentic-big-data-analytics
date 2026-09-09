@@ -9,6 +9,7 @@ on:
       - 'scripts/external_spark_validation.py'
       - 'scripts/benchmark.py'
       - 'tests/test_external_spark_validation.py'
+      - 'tests/test_spark_mapping_contract.py'
       - '.github/workflows/ephemeral-spark-validation.yml'
 
 concurrency:
@@ -41,6 +42,7 @@ jobs:
             /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master \
             --host 0.0.0.0 --port 7077 --webui-port 8080
           docker run -d --name spark-worker --network hr-spark-ci \
+            --add-host host.docker.internal:host-gateway \
             apache/spark:3.5.8-python3 \
             /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker \
             spark://spark-master:7077 --cores 2 --memory 2g
@@ -86,14 +88,17 @@ jobs:
           fi
 
       - name: Run external Spark protocol against ephemeral cluster
+        env:
+          HR_ANALYTICS_SPARK_MASTER: spark://127.0.0.1:7077
+          HR_ANALYTICS_SPARK_DRIVER_HOST: host.docker.internal
+          HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS: 0.0.0.0
         run: |
           . .venv/bin/activate
           mkdir -p artifacts
-          HR_ANALYTICS_SPARK_MASTER=spark://127.0.0.1:7077 \
-            python scripts/external_spark_validation.py \
-              --sizes 100 1000 10000 \
-              --seed 42 \
-              --output artifacts/external-spark.json
+          python scripts/external_spark_validation.py \
+            --sizes 100 1000 10000 \
+            --seed 42 \
+            --output artifacts/external-spark.json
 
       - name: Validate evidence artifact
         run: |
