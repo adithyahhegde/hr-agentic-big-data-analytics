@@ -103,16 +103,16 @@ jobs:
           external = Path('artifacts/external-spark.json')
           if external.exists():
               result = json.loads(external.read_text())
-              assert result['protocol'] == 'external_spark_scalability_v1'
+              assert result['protocol'] == 'external_spark_scalability_v2'
               assert result['sizes'] == [100, 1000, 10000]
               assert result['seed'] == 42
               assert [run['rows'] for run in result['runs']] == result['sizes']
               for run in result['runs']:
-                  assert run['validation'] == {
-                      'row_count_matches_fixture': True,
-                      'raw_rows_returned': False,
-                      'distributed': True,
-                  }
+                  validation = run['validation']
+                  assert validation['row_count_matches_fixture'] is True
+                  assert validation['raw_rows_returned'] is False
+                  assert validation['distributed'] is True
+                  assert validation['aggregates_match_local_baseline'] is True
                   assert run['elapsed_seconds'] >= 0
                   assert run['rows_per_second'] is not None and run['rows_per_second'] > 0
           PY
