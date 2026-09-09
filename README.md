@@ -49,7 +49,7 @@ The project deliberately makes **no broad novelty or "first" claim**. Existing a
 
 The repository includes deterministic benchmark generation plus regression tests for routing, data quality, schema interpretation, persistence/provenance, bounded synthesis, report privacy, bounded AutoML guardrails, explainability, and benchmark behavior. The reproducible evaluation workflow installs the `dev,ml,explainability,bigdata` environment so Spark-backed validation can run when an external target is configured.
 
-A successful CI evaluation run on 2026-09-08 recorded fixture-based empirical evidence for objective feasibility, comparative schema mapping, bounded agent reliability, robustness/scalability, and the optional SHAP smoke test. The detailed values and limitations are recorded in `docs/EVALUATION_RESULTS.md`. These measurements are not evidence of real-world HR generalization or production decision performance.
+A successful CI evaluation run on 2026-09-09 recorded fixture-based empirical evidence for objective feasibility, comparative schema mapping, bounded agent reliability, robustness/scalability, and the optional SHAP smoke test. The detailed values and limitations are recorded in `docs/EVALUATION_RESULTS.md`. These measurements are not evidence of real-world HR generalization or production decision performance.
 
 ## Product boundary
 
