@@ -21,6 +21,14 @@ def _aggregate_contract():
     }
 
 
+def _stub_local_baseline(monkeypatch):
+    monkeypatch.setattr(
+        external_validation,
+        "analyze_csv",
+        lambda *args, **kwargs: {"row_count": 1, **_aggregate_contract()},
+    )
+
+
 def test_external_validation_requires_explicit_master(monkeypatch):
     monkeypatch.delenv("HR_ANALYTICS_SPARK_MASTER", raising=False)
     with pytest.raises(ValueError, match="HR_ANALYTICS_SPARK_MASTER"):
@@ -51,6 +59,8 @@ def test_external_validation_rejects_whitespace_only_master(monkeypatch):
 
 
 def test_external_validation_strips_master_whitespace(monkeypatch):
+    _stub_local_baseline(monkeypatch)
+
     def fake_analyze(*args, **kwargs):
         assert kwargs["master"] == "spark://example:7077"
         assert kwargs["stop_session"] is True
@@ -84,6 +94,7 @@ def test_external_validation_rejects_unbounded_sizes():
 
 
 def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
+    _stub_local_baseline(monkeypatch)
     calls = []
 
     def fake_analyze(path_lines, mappings, **kwargs):
@@ -108,6 +119,8 @@ def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
 
 
 def test_external_validation_fixture_fingerprint_is_reproducible(monkeypatch):
+    _stub_local_baseline(monkeypatch)
+
     def fake_analyze(*args, **kwargs):
         rows = len(args[0]) - 1
         return {"row_count": rows, **_aggregate_contract(), "execution": {"distributed": True, "raw_rows_returned": False}}
@@ -120,6 +133,8 @@ def test_external_validation_fixture_fingerprint_is_reproducible(monkeypatch):
 
 
 def test_external_validation_preserves_cluster_provenance(monkeypatch):
+    _stub_local_baseline(monkeypatch)
+
     def fake_analyze(*args, **kwargs):
         return {
             "row_count": 10,
@@ -179,6 +194,8 @@ def test_external_validation_requires_aggregate_fields(monkeypatch):
 
 
 def test_external_validation_returns_verified_contract(monkeypatch):
+    _stub_local_baseline(monkeypatch)
+
     def fake_analyze(*args, **kwargs):
         return {
             "row_count": 10,
