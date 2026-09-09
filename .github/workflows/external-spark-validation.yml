@@ -10,6 +10,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       HR_ANALYTICS_SPARK_MASTER: ${{ secrets.HR_ANALYTICS_SPARK_MASTER }}
     steps:
@@ -25,6 +26,24 @@ jobs:
           case "$HR_ANALYTICS_SPARK_MASTER" in
             spark://localhost:*|spark://127.0.0.1:*|spark://\[::1\]:*) echo 'Local/loopback Spark masters are not accepted.'; exit 1;;
           esac
+      - name: Preflight target connectivity
+        run: |
+          python - <<'PY'
+          import socket
+          from urllib.parse import urlsplit
+
+          master = "$HR_ANALYTICS_SPARK_MASTER".strip()
+          parsed = urlsplit(master)
+          if parsed.scheme != "spark" or not parsed.hostname or parsed.port is None:
+              raise SystemExit("HR_ANALYTICS_SPARK_MASTER must be spark://host:port")
+          try:
+              with socket.create_connection((parsed.hostname, parsed.port), timeout=5):
+                  print(f"Target Spark master TCP endpoint reachable: {parsed.hostname}:{parsed.port}")
+          except OSError as error:
+              raise SystemExit(
+                  f"Target Spark master is not reachable from this runner at {parsed.hostname}:{parsed.port}: {error}"
+              )
+          PY
       - name: Install validation dependencies
         run: python -m pip install --upgrade pip && pip install -e '.[dev,bigdata]'
       - name: Run external Spark protocol
