@@ -25,19 +25,9 @@ jobs:
       spark-master:
         image: apache/spark:3.5.8-python3
         command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master", "--host", "spark-master", "--port", "7077", "--webui-port", "8080"]
-        options: >-
-          --health-cmd "bash -lc 'cat < /dev/null > /dev/tcp/127.0.0.1/7077'"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 20
       spark-worker:
         image: apache/spark:3.5.8-python3
         command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077", "--cores", "2", "--memory", "2g"]
-        options: >-
-          --health-cmd "bash -lc 'pgrep -f org.apache.spark.deploy.worker.Worker >/dev/null'"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 20
 
     steps:
       - name: Check out repository
