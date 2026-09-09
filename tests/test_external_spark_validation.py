@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 import scripts.external_spark_validation as external_validation
 from scripts.external_spark_validation import validate, validate_sizes
+
+ROOT = Path(__file__).resolve().parents[1]
+EXTERNAL_WORKFLOW = (ROOT / ".github" / "workflows" / "external-spark-validation.yml").read_text(encoding="utf-8")
+EVALUATION_WORKFLOW = (ROOT / ".github" / "workflows" / "evaluation.yml").read_text(encoding="utf-8")
 
 
 def test_external_validation_requires_explicit_master(monkeypatch):
@@ -178,22 +184,6 @@ def test_external_validation_rejects_aggregate_mismatch(monkeypatch):
 
 
 def test_external_validation_accepts_matching_aggregate_baseline(monkeypatch):
-    def fake_analyze(path_lines, mappings, **kwargs):
-        from app.services.analytics import analyze_csv
-        path = kwargs.pop("_fixture_path")
-        expected = external_validation._aggregate_signature(analyze_csv(path, mappings))
-        return {
-            **expected,
-            "execution": {"distributed": True, "raw_rows_returned": False},
-        }
-
-    original = external_validation.analyze_spark_csv_lines
-
-    def fake_with_path(lines, mappings, **kwargs):
-        rows = len(lines) - 1
-        return {"row_count": rows, "duplicate_row_count": 0, "numeric_summary": [], "categorical_summary": [], "missing_by_field": [], "execution": {"distributed": True, "raw_rows_returned": False}}
-
-    # The contract is exercised directly because the Spark dependency is optional in unit CI.
     result = external_validation._validate_result(
         {
             "row_count": 1,
@@ -207,4 +197,17 @@ def test_external_validation_accepts_matching_aggregate_baseline(monkeypatch):
         {"row_count": 1, "duplicate_row_count": 0, "numeric_summary": [], "categorical_summary": [], "missing_by_field": []},
     )
     assert result["aggregates_match_local_baseline"] is True
-    assert original is not None
+
+
+def test_external_workflows_validate_the_v2_artifact_contract():
+    for workflow in (EXTERNAL_WORKFLOW, EVALUATION_WORKFLOW):
+        assert "external_spark_scalability_v2" in workflow
+        assert "result['protocol']" in workflow or "result[\"protocol\"]" in workflow
+        assert "run['rows']" in workflow or "run[\"rows\"]" in workflow
+        assert "validation['distributed']" in workflow or "validation[\"distributed\"]" in workflow
+        assert "validation['raw_rows_returned']" in workflow or "validation[\"raw_rows_returned\"]" in workflow
+        assert "aggregates_match_local_baseline" in workflow
+        assert "rows_per_second" in workflow
+
+    assert "protocol_version" not in EXTERNAL_WORKFLOW
+    assert "measurements" not in EXTERNAL_WORKFLOW
