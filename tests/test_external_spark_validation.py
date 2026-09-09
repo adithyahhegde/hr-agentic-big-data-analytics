@@ -12,8 +12,9 @@ EXTERNAL_WORKFLOW = (ROOT / ".github" / "workflows" / "external-spark-validation
 EVALUATION_WORKFLOW = (ROOT / ".github" / "workflows" / "evaluation.yml").read_text(encoding="utf-8")
 
 
-def _aggregate_contract():
+def _aggregate_contract(rows: int):
     return {
+        "row_count": rows,
         "duplicate_row_count": 0,
         "numeric_summary": [],
         "categorical_summary": [],
@@ -24,7 +25,7 @@ def _aggregate_contract():
 def _stub_local_baseline(monkeypatch):
     def fake_local(path, mappings):
         rows = sum(1 for _ in path.read_text(encoding="utf-8").splitlines()) - 1
-        return {"row_count": rows, **_aggregate_contract()}
+        return _aggregate_contract(rows)
 
     monkeypatch.setattr(external_validation, "analyze_csv", fake_local)
 
@@ -64,7 +65,7 @@ def test_external_validation_strips_master_whitespace(monkeypatch):
     def fake_analyze(*args, **kwargs):
         assert kwargs["master"] == "spark://example:7077"
         assert kwargs["stop_session"] is True
-        return {"row_count": 10, **_aggregate_contract(), "execution": {"distributed": True, "raw_rows_returned": False}}
+        return {**_aggregate_contract(10), "execution": {"distributed": True, "raw_rows_returned": False}}
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     result = validate(rows=10, master="  spark://example:7077  ")
@@ -100,7 +101,7 @@ def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
     def fake_analyze(path_lines, mappings, **kwargs):
         rows = len(path_lines) - 1
         calls.append((rows, kwargs["master"], kwargs["stop_session"], path_lines[0]))
-        return {"row_count": rows, **_aggregate_contract(), "execution": {"distributed": True, "raw_rows_returned": False}}
+        return {**_aggregate_contract(rows), "execution": {"distributed": True, "raw_rows_returned": False}}
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     result = validate_sizes(sizes=[1000, 100, 1000], seed=42, master="spark://example:7077")
@@ -123,7 +124,7 @@ def test_external_validation_fixture_fingerprint_is_reproducible(monkeypatch):
 
     def fake_analyze(*args, **kwargs):
         rows = len(args[0]) - 1
-        return {"row_count": rows, **_aggregate_contract(), "execution": {"distributed": True, "raw_rows_returned": False}}
+        return {**_aggregate_contract(rows), "execution": {"distributed": True, "raw_rows_returned": False}}
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     first = validate_sizes(sizes=[100], seed=42, master="spark://example:7077")
@@ -137,8 +138,7 @@ def test_external_validation_preserves_cluster_provenance(monkeypatch):
 
     def fake_analyze(*args, **kwargs):
         return {
-            "row_count": 10,
-            **_aggregate_contract(),
+            **_aggregate_contract(10),
             "execution": {
                 "distributed": True,
                 "raw_rows_returned": False,
@@ -161,8 +161,7 @@ def test_external_validation_preserves_cluster_provenance(monkeypatch):
 def test_external_validation_requires_distributed_and_non_raw_result(monkeypatch):
     def fake_analyze(*args, **kwargs):
         return {
-            "row_count": 10,
-            **_aggregate_contract(),
+            **_aggregate_contract(10),
             "execution": {"distributed": False, "raw_rows_returned": False},
         }
 
@@ -174,8 +173,7 @@ def test_external_validation_requires_distributed_and_non_raw_result(monkeypatch
 def test_external_validation_rejects_raw_rows(monkeypatch):
     def fake_analyze(*args, **kwargs):
         return {
-            "row_count": 10,
-            **_aggregate_contract(),
+            **_aggregate_contract(10),
             "execution": {"distributed": True, "raw_rows_returned": True},
         }
 
@@ -198,8 +196,7 @@ def test_external_validation_returns_verified_contract(monkeypatch):
 
     def fake_analyze(*args, **kwargs):
         return {
-            "row_count": 10,
-            **_aggregate_contract(),
+            **_aggregate_contract(10),
             "execution": {"distributed": True, "raw_rows_returned": False},
         }
 
@@ -216,11 +213,8 @@ def test_external_validation_rejects_aggregate_mismatch(monkeypatch):
     def fake_analyze(path_lines, mappings, **kwargs):
         rows = len(path_lines) - 1
         return {
-            "row_count": rows,
-            "duplicate_row_count": 0,
-            "numeric_summary": [],
-            "categorical_summary": [],
-            "missing_by_field": [],
+            **_aggregate_contract(rows),
+            "numeric_summary": [{"field": "salary", "count": rows, "min": 0.0, "max": 1.0, "mean": 0.5}],
             "execution": {"distributed": True, "raw_rows_returned": False},
         }
 
