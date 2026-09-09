@@ -130,9 +130,8 @@ def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dic
 
 
 def validate(*, rows: int = 10_000, seed: int = 42, master: str | None = None) -> dict[str, Any]:
-    if rows < 1:
-        raise ValueError("rows must be positive")
-    return validate_sizes(sizes=(rows,), seed=seed, master=master, protocol=PROTOCOL_VERSION)["runs"][0]
+    normalized_rows = _validate_sizes((rows,))[0]
+    return validate_sizes(sizes=(normalized_rows,), seed=seed, master=master, protocol=PROTOCOL_VERSION)["runs"][0]
 
 
 def validate_sizes(*, sizes: Sequence[int] = DEFAULT_SIZES, seed: int = 42, master: str | None = None, protocol: str = PROTOCOL_VERSION) -> dict[str, Any]:
