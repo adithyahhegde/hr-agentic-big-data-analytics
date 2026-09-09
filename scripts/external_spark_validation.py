@@ -89,7 +89,8 @@ def validate_sizes(
     Only aggregate results are retained. Each size gets a fresh deterministic
     fixture. CSV content is transferred to the target Spark application through
     an RDD so validation does not depend on executor access to a driver-local
-    temporary filesystem.
+    temporary filesystem. Each measurement can explicitly stop its Spark
+    session so repeated sizes do not retain cluster resources between runs.
     """
     normalized_sizes = _validate_sizes(sizes)
     configured_master = _validate_external_master(master)
@@ -105,7 +106,12 @@ def validate_sizes(
             fixture_schema = list(path.read_text(encoding="utf-8").splitlines()[0].split(","))
             started = time.perf_counter()
             lines = fixture_bytes.decode("utf-8").splitlines()
-            result = analyze_spark_csv_lines(lines, MAPPINGS, master=configured_master)
+            result = analyze_spark_csv_lines(
+                lines,
+                MAPPINGS,
+                master=configured_master,
+                stop_session=True,
+            )
             elapsed = time.perf_counter() - started
             validation = _validate_result(result, rows)
             runs.append({

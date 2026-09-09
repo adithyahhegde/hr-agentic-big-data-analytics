@@ -147,20 +147,36 @@ def analyze_spark(path: Path, mappings: dict[str, str], max_categories: int = 5,
     return result
 
 
-def analyze_spark_csv_lines(lines: Iterable[str], mappings: dict[str, str], max_categories: int = 5, master: str | None = None) -> dict[str, Any]:
-    """Analyze CSV text without requiring executor access to a driver's filesystem."""
+def analyze_spark_csv_lines(
+    lines: Iterable[str],
+    mappings: dict[str, str],
+    max_categories: int = 5,
+    master: str | None = None,
+    *,
+    stop_session: bool = False,
+) -> dict[str, Any]:
+    """Analyze CSV text without requiring executor access to a driver's filesystem.
+
+    ``stop_session`` is opt-in because normal application calls may intentionally
+    reuse the Spark session. External validation enables it so repeated target-
+    cluster measurements do not retain Spark resources between sizes.
+    """
     spark = _spark_session(master)
     configured_master = master or os.getenv("HR_ANALYTICS_SPARK_MASTER") or "local[*]"
-    materialized = list(lines)
-    if not materialized:
-        raise ValueError("CSV input must contain at least a header row")
-    parallelism = max(1, min(len(materialized), spark.sparkContext.defaultParallelism * 2))
-    rdd = spark.sparkContext.parallelize(materialized, parallelism)
-    df = spark.read.option("header", True).option("inferSchema", True).csv(rdd)
-    result = _analyze_dataframe(df, mappings, max_categories=max_categories)
-    result["execution"] = _execution_metadata(
-        spark,
-        distributed=not configured_master.startswith("local"),
-        input_mode="driver_parallelized_csv",
-    )
-    return result
+    try:
+        materialized = list(lines)
+        if not materialized:
+            raise ValueError("CSV input must contain at least a header row")
+        parallelism = max(1, min(len(materialized), spark.sparkContext.defaultParallelism * 2))
+        rdd = spark.sparkContext.parallelize(materialized, parallelism)
+        df = spark.read.option("header", True).option("inferSchema", True).csv(rdd)
+        result = _analyze_dataframe(df, mappings, max_categories=max_categories)
+        result["execution"] = _execution_metadata(
+            spark,
+            distributed=not configured_master.startswith("local"),
+            input_mode="driver_parallelized_csv",
+        )
+        return result
+    finally:
+        if stop_session:
+            spark.stop()
