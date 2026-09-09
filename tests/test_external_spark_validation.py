@@ -219,3 +219,5 @@ def test_external_workflow_has_bounded_runner_timeout_and_target_preflight():
     assert "socket.create_connection" in EXTERNAL_WORKFLOW
     assert "timeout=5" in EXTERNAL_WORKFLOW
     assert "Target Spark master is not reachable from this runner" in EXTERNAL_WORKFLOW
+    assert 'os.environ["HR_ANALYTICS_SPARK_MASTER"]' in EXTERNAL_WORKFLOW
+    assert 'master = "$HR_ANALYTICS_SPARK_MASTER"' not in EXTERNAL_WORKFLOW
