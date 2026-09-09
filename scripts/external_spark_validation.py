@@ -27,6 +27,7 @@ except ModuleNotFoundError:
     from benchmark import MAPPINGS, make_fixture
 
 DEFAULT_SIZES = (100, 1_000, 10_000)
+MAX_VALIDATION_ROWS = 100_000
 PROTOCOL_VERSION = "external_spark_scalability_v2"
 NUMERIC_ABS_TOLERANCE = 1e-9
 NUMERIC_REL_TOLERANCE = 1e-6
@@ -55,6 +56,8 @@ def _validate_sizes(sizes: Sequence[int]) -> list[int]:
     normalized = sorted(set(sizes))
     if not normalized or any(size < 1 for size in normalized):
         raise ValueError("sizes must contain positive integers")
+    if any(size > MAX_VALIDATION_ROWS for size in normalized):
+        raise ValueError(f"sizes must not exceed {MAX_VALIDATION_ROWS:,} rows")
     return normalized
 
 
@@ -116,11 +119,13 @@ def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dic
         raise RuntimeError("external Spark validation must not return raw rows")
     if expected_aggregates is not None:
         aggregate_fields = {"duplicate_row_count", "numeric_summary", "categorical_summary", "missing_by_field"}
-        if aggregate_fields.issubset(result):
-            actual = _aggregate_signature(result)
-            validation["aggregates_match_local_baseline"] = _aggregate_values_match(actual, expected_aggregates)
-            if not validation["aggregates_match_local_baseline"]:
-                raise RuntimeError("external Spark aggregates differ from the deterministic local baseline")
+        if not aggregate_fields.issubset(result):
+            missing = sorted(aggregate_fields.difference(result))
+            raise RuntimeError(f"external Spark result is missing required aggregate fields: {', '.join(missing)}")
+        actual = _aggregate_signature(result)
+        validation["aggregates_match_local_baseline"] = _aggregate_values_match(actual, expected_aggregates)
+        if not validation["aggregates_match_local_baseline"]:
+            raise RuntimeError("external Spark aggregates differ from the deterministic local baseline")
     return validation
 
 
