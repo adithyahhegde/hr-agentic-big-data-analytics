@@ -40,7 +40,6 @@ def test_motion_and_focus_preferences_are_defined():
 def test_modern_feedback_layer_is_loaded_and_safe():
     assert '<link rel="stylesheet" href="/static/ui-enhancements.css">' in INDEX
     assert '<script src="/static/ui-enhancements.js" defer></script>' in INDEX
-    assert 'role',
     assert 'textContent = message' in JS
     assert 'aria-label="Dismiss notification"' in JS
 
