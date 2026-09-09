@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.spark_analytics import _canonicalize_dataframe, _number_columns
+from app.services.spark_analytics import _canonicalize_dataframe, _number_columns, _spark_session
 
 
 class FakeDataFrame:
@@ -73,3 +73,40 @@ def test_spark_numeric_contract_is_based_on_canonical_hr_field_not_inferred_dtyp
 
     assert normalized.columns == ["salary", "age"]
     assert _number_columns(normalized, fields) == {"age": "age", "salary": "salary"}
+
+
+class FakeBuilder:
+    def __init__(self):
+        self.calls = []
+
+    def appName(self, value):
+        self.calls.append(("appName", value))
+        return self
+
+    def master(self, value):
+        self.calls.append(("master", value))
+        return self
+
+    def config(self, key, value):
+        self.calls.append(("config", key, value))
+        return self
+
+    def getOrCreate(self):
+        return self
+
+
+def test_spark_session_applies_remote_driver_network_configuration(monkeypatch):
+    builder = FakeBuilder()
+
+    class FakeSparkSession:
+        builder = builder
+
+    monkeypatch.setitem(__import__("sys").modules, "pyspark.sql", type("FakeSql", (), {"SparkSession": FakeSparkSession}))
+    monkeypatch.setenv("HR_ANALYTICS_SPARK_DRIVER_HOST", "host.docker.internal")
+    monkeypatch.setenv("HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS", "0.0.0.0")
+
+    _spark_session("spark://127.0.0.1:7077")
+
+    assert ("master", "spark://127.0.0.1:7077") in builder.calls
+    assert ("config", "spark.driver.host", "host.docker.internal") in builder.calls
+    assert ("config", "spark.driver.bindAddress", "0.0.0.0") in builder.calls
