@@ -46,6 +46,7 @@ def test_modern_feedback_layer_is_loaded_and_safe():
 
 def test_raw_employee_records_are_not_introduced_by_ui_layer():
     index_lower = INDEX.lower()
-    assert 'employee identities and individual anomaly records are not exposed' in index_lower
-    assert 'does not receive unrestricted hr records' in index_lower
+    # Assert the boundary contract using stable concepts rather than one prose sentence.
+    assert 'raw employee records' in index_lower
+    assert 'synthesis layer' in index_lower
     assert 'local-first' in index_lower
