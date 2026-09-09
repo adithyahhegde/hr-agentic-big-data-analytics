@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.spark_analytics import _canonicalize_dataframe
+from app.services.spark_analytics import _canonicalize_dataframe, _number_columns
 
 
 class FakeDataFrame:
@@ -62,3 +62,14 @@ def test_spark_mapping_blocks_collision_with_existing_canonical_column():
     frame = FakeDataFrame(["Employee ID", "employee_id"])
     with pytest.raises(ValueError, match="Spark mapping collision"):
         _canonicalize_dataframe(frame, {"Employee ID": "employee_id"})
+
+
+def test_spark_numeric_contract_is_based_on_canonical_hr_field_not_inferred_dtype():
+    frame = FakeDataFrame(["Annual Pay", "Employee Age"])
+    normalized, fields = _canonicalize_dataframe(
+        frame,
+        {"Annual Pay": "salary", "Employee Age": "age"},
+    )
+
+    assert normalized.columns == ["salary", "age"]
+    assert _number_columns(normalized, fields) == {"age": "age", "salary": "salary"}
