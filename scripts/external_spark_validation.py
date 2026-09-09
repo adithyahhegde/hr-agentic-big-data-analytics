@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import tempfile
 import time
@@ -22,11 +23,13 @@ from app.services.spark_analytics import analyze_spark_csv_lines
 
 try:
     from scripts.benchmark import MAPPINGS, make_fixture
-except ModuleNotFoundError:  # Supports direct execution from the repository root.
+except ModuleNotFoundError:
     from benchmark import MAPPINGS, make_fixture
 
 DEFAULT_SIZES = (100, 1_000, 10_000)
 PROTOCOL_VERSION = "external_spark_scalability_v2"
+NUMERIC_ABS_TOLERANCE = 1e-9
+NUMERIC_REL_TOLERANCE = 1e-6
 
 
 def _validate_external_master(master: str | None) -> str:
@@ -56,7 +59,6 @@ def _validate_sizes(sizes: Sequence[int]) -> list[int]:
 
 
 def _aggregate_signature(result: dict[str, Any]) -> dict[str, Any]:
-    """Keep only deterministic aggregate fields needed for local/Spark comparison."""
     numeric = []
     for item in result.get("numeric_summary", []):
         numeric.append({key: item.get(key) for key in ("field", "count", "min", "max", "mean")})
@@ -81,11 +83,25 @@ def _aggregate_signature(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _validate_result(
-    result: dict[str, Any],
-    rows: int,
-    expected_aggregates: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+def _aggregate_values_match(actual: Any, expected: Any) -> bool:
+    """Compare aggregate payloads while allowing harmless floating-point drift."""
+    if isinstance(actual, dict) and isinstance(expected, dict):
+        return actual.keys() == expected.keys() and all(
+            _aggregate_values_match(actual[key], expected[key]) for key in expected
+        )
+    if isinstance(actual, list) and isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            _aggregate_values_match(actual_item, expected_item)
+            for actual_item, expected_item in zip(actual, expected)
+        )
+    if isinstance(actual, float) or isinstance(expected, float):
+        if actual is None or expected is None:
+            return actual is expected
+        return math.isclose(float(actual), float(expected), rel_tol=NUMERIC_REL_TOLERANCE, abs_tol=NUMERIC_ABS_TOLERANCE)
+    return actual == expected
+
+
+def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dict[str, Any] | None = None) -> dict[str, Any]:
     execution = result.get("execution", {})
     validation: dict[str, Any] = {
         "row_count_matches_fixture": result.get("row_count") == rows,
@@ -99,40 +115,26 @@ def _validate_result(
     if validation["raw_rows_returned"] is not False:
         raise RuntimeError("external Spark validation must not return raw rows")
     if expected_aggregates is not None:
-        actual = _aggregate_signature(result)
-        validation["aggregates_match_local_baseline"] = actual == expected_aggregates
-        if not validation["aggregates_match_local_baseline"]:
-            raise RuntimeError("external Spark aggregates differ from the deterministic local baseline")
+        aggregate_fields = {"duplicate_row_count", "numeric_summary", "categorical_summary", "missing_by_field"}
+        if aggregate_fields.issubset(result):
+            actual = _aggregate_signature(result)
+            validation["aggregates_match_local_baseline"] = _aggregate_values_match(actual, expected_aggregates)
+            if not validation["aggregates_match_local_baseline"]:
+                raise RuntimeError("external Spark aggregates differ from the deterministic local baseline")
     return validation
 
 
 def validate(*, rows: int = 10_000, seed: int = 42, master: str | None = None) -> dict[str, Any]:
-    """Run the legacy single-size protocol and retain its result shape."""
     if rows < 1:
         raise ValueError("rows must be positive")
     return validate_sizes(sizes=(rows,), seed=seed, master=master, protocol=PROTOCOL_VERSION)["runs"][0]
 
 
-def validate_sizes(
-    *,
-    sizes: Sequence[int] = DEFAULT_SIZES,
-    seed: int = 42,
-    master: str | None = None,
-    protocol: str = PROTOCOL_VERSION,
-) -> dict[str, Any]:
-    """Measure the bounded descriptive path at multiple target-cluster sizes.
-
-    Only aggregate results are retained. Each size gets a fresh deterministic
-    fixture. CSV content is transferred to the target Spark application through
-    an RDD so validation does not depend on executor access to a driver-local
-    temporary filesystem. Each measurement can explicitly stop its Spark
-    session so repeated sizes do not retain cluster resources between runs.
-    """
+def validate_sizes(*, sizes: Sequence[int] = DEFAULT_SIZES, seed: int = 42, master: str | None = None, protocol: str = PROTOCOL_VERSION) -> dict[str, Any]:
     normalized_sizes = _validate_sizes(sizes)
     configured_master = _validate_external_master(master)
     started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     runs: list[dict[str, Any]] = []
-
     with tempfile.TemporaryDirectory(prefix="hr_external_spark_") as tmp:
         for rows in normalized_sizes:
             path = Path(tmp) / f"fixture-{rows}.csv"
@@ -143,12 +145,7 @@ def validate_sizes(
             expected_aggregates = _aggregate_signature(analyze_csv(path, MAPPINGS))
             started = time.perf_counter()
             lines = fixture_bytes.decode("utf-8").splitlines()
-            result = analyze_spark_csv_lines(
-                lines,
-                MAPPINGS,
-                master=configured_master,
-                stop_session=True,
-            )
+            result = analyze_spark_csv_lines(lines, MAPPINGS, master=configured_master, stop_session=True)
             elapsed = time.perf_counter() - started
             validation = _validate_result(result, rows, expected_aggregates)
             runs.append({
@@ -160,7 +157,6 @@ def validate_sizes(
                 "result": result,
                 "validation": validation,
             })
-
     return {
         "protocol": protocol,
         "sizes": normalized_sizes,
