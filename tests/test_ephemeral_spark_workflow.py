@@ -10,10 +10,11 @@ WORKFLOW = (ROOT / ".github" / "workflows" / "ephemeral-spark-validation.yml").r
 def test_ephemeral_spark_workflow_uses_supported_runtime_provisioning():
     assert "actions/setup-python@v5" in WORKFLOW
     assert "python-version: '3.11'" in WORKFLOW
-    assert "actions/setup-java@v4" in WORKFLOW
+    assert "actions/setup-java@v5" in WORKFLOW
     assert "java-version: '17'" in WORKFLOW
     assert "apt-get install" not in WORKFLOW
     assert "python3.11" not in WORKFLOW
+    assert "cache: maven" not in WORKFLOW
 
 
 def test_ephemeral_spark_workflow_uses_explicit_pinned_spark_processes():
