@@ -52,6 +52,7 @@ def test_external_validation_protocol_has_bounded_defaults():
     assert signature.parameters["rows"].default == 10_000
     assert signature.parameters["seed"].default == 42
     assert external_validation.DEFAULT_SIZES == (100, 1_000, 10_000)
+    assert external_validation.PROTOCOL_VERSION == "external_spark_scalability_v2"
 
 
 def test_external_validation_rejects_invalid_sizes(monkeypatch):
@@ -69,15 +70,29 @@ def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     result = validate_sizes(sizes=[1000, 100, 1000], seed=42, master="spark://example:7077")
-    assert result["protocol"] == "external_spark_scalability_v1"
+    assert result["protocol"] == "external_spark_scalability_v2"
     assert result["sizes"] == [100, 1000]
     assert [run["rows"] for run in result["runs"]] == [100, 1000]
     assert all(run["elapsed_seconds"] >= 0 for run in result["runs"])
     assert all(run["rows_per_second"] is not None and run["rows_per_second"] > 0 for run in result["runs"])
+    assert all(len(run["fixture_sha256"]) == 64 for run in result["runs"])
+    assert result["started_at"].endswith("Z")
     assert calls[0][0] == 100
     assert calls[1][0] == 1000
     assert all(call[1] == "spark://example:7077" for call in calls)
     assert all(call[2].startswith("employee_id,") for call in calls)
+
+
+def test_external_validation_fixture_fingerprint_is_reproducible(monkeypatch):
+    def fake_analyze(*args, **kwargs):
+        rows = len(args[0]) - 1
+        return {"row_count": rows, "execution": {"distributed": True, "raw_rows_returned": False}}
+
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
+    first = validate_sizes(sizes=[100], seed=42, master="spark://example:7077")
+    second = validate_sizes(sizes=[100], seed=42, master="spark://example:7077")
+    assert first["runs"][0]["fixture_sha256"] == second["runs"][0]["fixture_sha256"]
+    assert first["runs"][0]["fixture_schema"] == second["runs"][0]["fixture_schema"]
 
 
 def test_external_validation_preserves_cluster_provenance(monkeypatch):

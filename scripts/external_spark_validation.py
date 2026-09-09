@@ -7,10 +7,12 @@ error. Use a master such as spark://host:7077 in an environment that can reach i
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import tempfile
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlsplit
@@ -23,6 +25,7 @@ except ModuleNotFoundError:  # Supports direct execution from the repository roo
     from benchmark import MAPPINGS, make_fixture
 
 DEFAULT_SIZES = (100, 1_000, 10_000)
+PROTOCOL_VERSION = "external_spark_scalability_v2"
 
 
 def _validate_external_master(master: str | None) -> str:
@@ -71,7 +74,7 @@ def validate(*, rows: int = 10_000, seed: int = 42, master: str | None = None) -
     """Run the legacy single-size protocol and retain its result shape."""
     if rows < 1:
         raise ValueError("rows must be positive")
-    return validate_sizes(sizes=(rows,), seed=seed, master=master, protocol="external_spark_validation_v1")["runs"][0]
+    return validate_sizes(sizes=(rows,), seed=seed, master=master, protocol=PROTOCOL_VERSION)["runs"][0]
 
 
 def validate_sizes(
@@ -79,7 +82,7 @@ def validate_sizes(
     sizes: Sequence[int] = DEFAULT_SIZES,
     seed: int = 42,
     master: str | None = None,
-    protocol: str = "external_spark_scalability_v1",
+    protocol: str = PROTOCOL_VERSION,
 ) -> dict[str, Any]:
     """Measure the bounded descriptive path at multiple target-cluster sizes.
 
@@ -90,19 +93,25 @@ def validate_sizes(
     """
     normalized_sizes = _validate_sizes(sizes)
     configured_master = _validate_external_master(master)
+    started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     runs: list[dict[str, Any]] = []
 
     with tempfile.TemporaryDirectory(prefix="hr_external_spark_") as tmp:
         for rows in normalized_sizes:
             path = Path(tmp) / f"fixture-{rows}.csv"
             make_fixture(path, rows, seed, "clean")
+            fixture_bytes = path.read_bytes()
+            fixture_sha256 = hashlib.sha256(fixture_bytes).hexdigest()
+            fixture_schema = list(path.read_text(encoding="utf-8").splitlines()[0].split(","))
             started = time.perf_counter()
-            lines = path.read_text(encoding="utf-8").splitlines()
+            lines = fixture_bytes.decode("utf-8").splitlines()
             result = analyze_spark_csv_lines(lines, MAPPINGS, master=configured_master)
             elapsed = time.perf_counter() - started
             validation = _validate_result(result, rows)
             runs.append({
                 "rows": rows,
+                "fixture_sha256": fixture_sha256,
+                "fixture_schema": fixture_schema,
                 "elapsed_seconds": round(elapsed, 6),
                 "rows_per_second": round(rows / elapsed, 3) if elapsed > 0 else None,
                 "result": result,
@@ -113,6 +122,7 @@ def validate_sizes(
         "protocol": protocol,
         "sizes": normalized_sizes,
         "seed": seed,
+        "started_at": started_at,
         "master_kind": configured_master.split(":", 1)[0],
         "runs": runs,
         "limitation": "Results depend on the configured target Spark cluster, worker resources, Spark version, and network/filesystem configuration. Wall-clock measurements are target-environment evidence, not universal performance guarantees.",
