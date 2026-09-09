@@ -211,3 +211,11 @@ def test_external_workflows_validate_the_v2_artifact_contract():
 
     assert "protocol_version" not in EXTERNAL_WORKFLOW
     assert "measurements" not in EXTERNAL_WORKFLOW
+
+
+def test_external_workflow_has_bounded_runner_timeout_and_target_preflight():
+    assert "timeout-minutes: 20" in EXTERNAL_WORKFLOW
+    assert "Preflight target connectivity" in EXTERNAL_WORKFLOW
+    assert "socket.create_connection" in EXTERNAL_WORKFLOW
+    assert "timeout=5" in EXTERNAL_WORKFLOW
+    assert "Target Spark master is not reachable from this runner" in EXTERNAL_WORKFLOW
