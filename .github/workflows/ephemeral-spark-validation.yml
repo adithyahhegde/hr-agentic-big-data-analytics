@@ -10,6 +10,7 @@ on:
       - 'scripts/benchmark.py'
       - 'tests/test_external_spark_validation.py'
       - 'tests/test_spark_mapping_contract.py'
+      - 'tests/test_ephemeral_spark_workflow.py'
       - '.github/workflows/ephemeral-spark-validation.yml'
 
 concurrency:
