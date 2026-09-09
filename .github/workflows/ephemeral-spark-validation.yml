@@ -24,9 +24,7 @@ jobs:
     services:
       spark-master:
         image: apache/spark:3.5.8-python3
-        entrypoint: /bin/bash
-        command: >-
-          -lc '/opt/spark/sbin/start-master.sh && tail -f /dev/null'
+        command: /bin/bash -lc "/opt/spark/sbin/start-master.sh && tail -f /dev/null"
         options: >-
           --health-cmd "bash -lc '</dev/tcp/127.0.0.1/7077'"
           --health-interval 5s
@@ -34,9 +32,7 @@ jobs:
           --health-retries 20
       spark-worker:
         image: apache/spark:3.5.8-python3
-        entrypoint: /bin/bash
-        command: >-
-          -lc '/opt/spark/sbin/start-worker.sh spark://spark-master:7077 && tail -f /dev/null'
+        command: /bin/bash -lc "/opt/spark/sbin/start-worker.sh spark://spark-master:7077 && tail -f /dev/null"
         env:
           SPARK_WORKER_CORES: '2'
           SPARK_WORKER_MEMORY: 2g
