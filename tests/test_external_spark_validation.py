@@ -89,6 +89,12 @@ def test_external_validation_rejects_invalid_sizes(monkeypatch):
         validate_sizes(sizes=[0, 10], master="spark://example:7077")
 
 
+@pytest.mark.parametrize("sizes", [["10"], [10.0], [True], [10, False]])
+def test_external_validation_rejects_non_integer_sizes(sizes):
+    with pytest.raises(ValueError, match="positive integers"):
+        validate_sizes(sizes=sizes, master="spark://example:7077")
+
+
 def test_external_validation_rejects_unbounded_sizes():
     with pytest.raises(ValueError, match="100,000"):
         validate_sizes(sizes=[100_001], master="spark://example:7077")
