@@ -132,13 +132,11 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
     for canonical in sorted(canonical_fields):
         if canonical in numeric_fields:
             continue
-        counts = (
-            df.filter(F.col(canonical).isNotNull())
-            .groupBy(F.col(canonical).cast("string").alias("value"))
-            .count()
-            .orderBy(F.desc("count"), F.asc("value"))
-            .limit(max_categories)
-            .collect()
+        # Keep the aggregation expression on one logical statement. This is
+        # easier to inspect and avoids parser-sensitive multiline grouping.
+        counts = df.filter(F.col(canonical).isNotNull()).groupBy(
+            F.col(canonical).cast("string").alias("value")
+        ).count().orderBy(F.desc("count"), F.asc("value")).limit(max_categories).collect()
         non_missing = df.filter(
             F.col(canonical).isNotNull() & (F.trim(F.col(canonical).cast("string")) != "")
         ).count()
