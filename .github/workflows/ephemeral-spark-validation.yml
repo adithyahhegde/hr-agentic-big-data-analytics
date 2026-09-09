@@ -19,16 +19,6 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    services:
-      spark-master:
-        image: apache/spark:3.5.8-python3
-        ports:
-          - 7077:7077
-          - 8080:8080
-        command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master", "--host", "0.0.0.0", "--port", "7077", "--webui-port", "8080"]
-      spark-worker:
-        image: apache/spark:3.5.8-python3
-        command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077", "--cores", "2", "--memory", "2g"]
 
     steps:
       - name: Check out repository
@@ -41,6 +31,21 @@ jobs:
           python3.11 --version
           java -version
 
+      - name: Start ephemeral Spark cluster
+        run: |
+          set -euxo pipefail
+          docker pull apache/spark:3.5.8-python3
+          docker network create hr-spark-ci
+          docker run -d --name spark-master --network hr-spark-ci -p 7077:7077 -p 8080:8080 \
+            apache/spark:3.5.8-python3 \
+            /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master \
+            --host 0.0.0.0 --port 7077 --webui-port 8080
+          docker run -d --name spark-worker --network hr-spark-ci \
+            apache/spark:3.5.8-python3 \
+            /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker \
+            spark://spark-master:7077 --cores 2 --memory 2g
+          docker ps --format 'table {{.Names}}\t{{.Status}}'
+
       - name: Install validation dependencies
         run: |
           python3.11 -m venv .venv
@@ -48,7 +53,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e '.[dev,bigdata]'
 
-      - name: Wait for Spark master
+      - name: Wait for Spark master and worker
         run: |
           for attempt in $(seq 1 30); do
             if python3.11 - <<'PY'
@@ -66,6 +71,19 @@ jobs:
           with socket.create_connection(('127.0.0.1', 7077), timeout=5):
               print('Spark master TCP endpoint reachable from the runner')
           PY
+          for attempt in $(seq 1 30); do
+            if docker logs spark-worker 2>&1 | grep -q 'Successfully registered with master'; then
+              echo 'Spark worker registered with master'
+              break
+            fi
+            sleep 2
+          done
+          if ! docker logs spark-worker 2>&1 | grep -q 'Successfully registered with master'; then
+            echo 'Spark worker did not register in time.'
+            docker logs spark-master
+            docker logs spark-worker
+            exit 1
+          fi
 
       - name: Run external Spark protocol against ephemeral cluster
         run: |
@@ -101,8 +119,22 @@ jobs:
           PY
 
       - name: Upload validation artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ephemeral-spark-validation-${{ github.sha }}
           path: artifacts/external-spark.json
           retention-days: 30
+
+      - name: Dump Spark logs on failure
+        if: failure()
+        run: |
+          docker ps -a --format 'table {{.Names}}\t{{.Status}}'
+          docker logs spark-master || true
+          docker logs spark-worker || true
+
+      - name: Stop ephemeral Spark cluster
+        if: always()
+        run: |
+          docker rm -f spark-worker spark-master || true
+          docker network rm hr-spark-ci || true
