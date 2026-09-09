@@ -36,13 +36,45 @@ def _execution_metadata(spark, *, distributed: bool, input_mode: str | None = No
     return metadata
 
 
-def _number_columns(df, canonical_to_source: dict[str, str]) -> dict[str, str]:
+def _canonicalize_dataframe(df, mappings: dict[str, str]):
+    """Rename mapped source columns to canonical HR fields before aggregation.
+
+    The application mapping contract is ``source_column -> canonical_field``.
+    Performing the normalization once at the DataFrame boundary prevents later
+    Spark expressions from accidentally referring to a canonical name that is
+    not the physical CSV column (especially for headers containing spaces).
+    """
+    mapped_canonicals: dict[str, str] = {}
+    current_columns = set(df.columns)
+    for source, canonical in mappings.items():
+        if canonical == "unknown" or source not in current_columns:
+            continue
+        if canonical in mapped_canonicals and mapped_canonicals[canonical] != source:
+            raise ValueError(
+                f"Multiple Spark source columns map to canonical field '{canonical}'"
+            )
+        if source == canonical:
+            mapped_canonicals[canonical] = source
+            continue
+        if canonical in current_columns:
+            raise ValueError(
+                f"Spark mapping collision: source '{source}' cannot be renamed to existing column '{canonical}'"
+            )
+        df = df.withColumnRenamed(source, canonical)
+        current_columns.remove(source)
+        current_columns.add(canonical)
+        mapped_canonicals[canonical] = source
+    return df, tuple(sorted(mapped_canonicals))
+
+
+def _number_columns(df, canonical_fields: Iterable[str]) -> dict[str, str]:
     numeric_types = {"tinyint", "smallint", "int", "bigint", "float", "double", "decimal"}
     result: dict[str, str] = {}
-    for canonical, source in canonical_to_source.items():
-        dtype = dict(df.dtypes).get(source, "")
+    dtypes = dict(df.dtypes)
+    for canonical in canonical_fields:
+        dtype = dtypes.get(canonical, "")
         if any(dtype.startswith(prefix) for prefix in numeric_types):
-            result[canonical] = source
+            result[canonical] = canonical
     return result
 
 
@@ -50,22 +82,19 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
     """Run the bounded descriptive aggregation over an existing Spark DataFrame."""
     from pyspark.sql import functions as F
 
-    source_to_canonical = {source: canonical for canonical, source in mappings.items() if canonical != "unknown"}
-    canonical_to_source = {canonical: source for source, canonical in source_to_canonical.items()}
+    df, canonical_fields = _canonicalize_dataframe(df, mappings)
     row_count = df.count()
 
     missing = []
     numeric_summary = []
     categorical_summary = []
 
-    for canonical, source in canonical_to_source.items():
-        if source not in df.columns:
-            continue
-        cleaned = F.trim(F.col(source).cast("string"))
-        missing_count = df.filter(F.col(source).isNull() | (cleaned == "")).count()
+    for canonical in canonical_fields:
+        cleaned = F.trim(F.col(canonical).cast("string"))
+        missing_count = df.filter(F.col(canonical).isNull() | (cleaned == "")).count()
         missing.append({"field": canonical, "missing": missing_count, "rate": round(missing_count / row_count, 4) if row_count else 0})
 
-    numeric_fields = _number_columns(df, canonical_to_source)
+    numeric_fields = _number_columns(df, canonical_fields)
     for canonical, source in sorted(numeric_fields.items()):
         stats = df.select(
             F.count(F.col(source)).alias("count"),
@@ -83,19 +112,19 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
             "stddev": float(stats["stddev"]) if stats["stddev"] is not None else None,
         })
 
-    for canonical, source in sorted(canonical_to_source.items()):
+    for canonical in sorted(canonical_fields):
         if canonical in numeric_fields:
             continue
         counts = (
-            df.filter(F.col(source).isNotNull())
-            .groupBy(F.col(source).cast("string").alias("value"))
+            df.filter(F.col(canonical).isNotNull())
+            .groupBy(F.col(canonical).cast("string").alias("value"))
             .count()
             .orderBy(F.desc("count"), F.asc("value"))
             .limit(max_categories)
             .collect()
         )
-        non_missing = df.filter(F.col(source).isNotNull() & (F.trim(F.col(source).cast("string")) != "")).count()
-        distinct = df.select(F.col(source).cast("string")).where(F.col(source).isNotNull()).distinct().count()
+        non_missing = df.filter(F.col(canonical).isNotNull() & (F.trim(F.col(canonical).cast("string")) != "")).count()
+        distinct = df.select(F.col(canonical).cast("string")).where(F.col(canonical).isNotNull()).distinct().count()
         categorical_summary.append({
             "field": canonical,
             "count": non_missing,
@@ -115,8 +144,8 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
     if duplicate_count:
         insights.append({"type": "DATA_QUALITY", "severity": "WARNING", "title": "Duplicate records detected", "evidence": f"{duplicate_count:,} duplicate rows were observed ({duplicate_count / row_count:.1%} of the dataset)."})
 
-    attrition_source = canonical_to_source.get("attrition")
-    if attrition_source and attrition_source in df.columns:
+    attrition_source = "attrition" if "attrition" in canonical_fields else None
+    if attrition_source:
         labels = F.lower(F.trim(F.col(attrition_source).cast("string")))
         total = df.filter(F.col(attrition_source).isNotNull() & (F.trim(F.col(attrition_source).cast("string")) != "")).count()
         positive = df.filter(labels.isin("yes", "y", "true", "1", "left", "terminated", "attrition")).count()
