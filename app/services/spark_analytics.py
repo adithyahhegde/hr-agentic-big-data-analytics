@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from typing import Any, Iterable
 
+from app.services.analytics import NUMERIC_FIELDS
+
 
 def _spark_session(master: str | None = None):
     from pyspark.sql import SparkSession
@@ -68,14 +70,16 @@ def _canonicalize_dataframe(df, mappings: dict[str, str]):
 
 
 def _number_columns(df, canonical_fields: Iterable[str]) -> dict[str, str]:
-    numeric_types = {"tinyint", "smallint", "int", "bigint", "float", "double", "decimal"}
-    result: dict[str, str] = {}
-    dtypes = dict(df.dtypes)
-    for canonical in canonical_fields:
-        dtype = dtypes.get(canonical, "")
-        if any(dtype.startswith(prefix) for prefix in numeric_types):
-            result[canonical] = canonical
-    return result
+    """Return canonical numeric HR fields, regardless of Spark's inferred CSV type."""
+    return {field: field for field in canonical_fields if field in NUMERIC_FIELDS}
+
+
+def _numeric_expression(column):
+    """Parse a canonical numeric field consistently with the local CSV path."""
+    from pyspark.sql import functions as F
+
+    cleaned = F.regexp_replace(F.trim(column.cast("string")), ",", "")
+    return cleaned.cast("double")
 
 
 def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) -> dict[str, Any]:
@@ -89,23 +93,36 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
     numeric_summary = []
     categorical_summary = []
 
-    for canonical in canonical_fields:
-        cleaned = F.trim(F.col(canonical).cast("string"))
-        missing_count = df.filter(F.col(canonical).isNull() | (cleaned == "")).count()
-        missing.append({"field": canonical, "missing": missing_count, "rate": round(missing_count / row_count, 4) if row_count else 0})
-
     numeric_fields = _number_columns(df, canonical_fields)
-    for canonical, source in sorted(numeric_fields.items()):
-        stats = df.select(
-            F.count(F.col(source)).alias("count"),
-            F.min(F.col(source)).alias("min"),
-            F.max(F.col(source)).alias("max"),
-            F.avg(F.col(source)).alias("mean"),
-            F.stddev(F.col(source)).alias("stddev"),
+    for canonical in canonical_fields:
+        column = F.col(canonical)
+        if canonical in numeric_fields:
+            valid_numeric = _numeric_expression(column)
+            missing_count = df.filter(column.isNull() | (valid_numeric.isNull())).count()
+        else:
+            cleaned = F.trim(column.cast("string"))
+            missing_count = df.filter(column.isNull() | (cleaned == "")).count()
+        missing.append({
+            "field": canonical,
+            "missing": missing_count,
+            "rate": round(missing_count / row_count, 4) if row_count else 0,
+        })
+
+    for canonical in sorted(numeric_fields):
+        parsed = _numeric_expression(F.col(canonical)).alias("_numeric_value")
+        stats = df.select(parsed).agg(
+            F.count(F.col("_numeric_value")).alias("count"),
+            F.min(F.col("_numeric_value")).alias("min"),
+            F.max(F.col("_numeric_value")).alias("max"),
+            F.avg(F.col("_numeric_value")).alias("mean"),
+            F.stddev(F.col("_numeric_value")).alias("stddev"),
         ).first()
+        count = int(stats["count"] or 0)
+        if count == 0:
+            continue
         numeric_summary.append({
             "field": canonical,
-            "count": int(stats["count"] or 0),
+            "count": count,
             "min": float(stats["min"]) if stats["min"] is not None else None,
             "max": float(stats["max"]) if stats["max"] is not None else None,
             "mean": float(stats["mean"]) if stats["mean"] is not None else None,
@@ -122,27 +139,53 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
             .orderBy(F.desc("count"), F.asc("value"))
             .limit(max_categories)
             .collect()
-        )
-        non_missing = df.filter(F.col(canonical).isNotNull() & (F.trim(F.col(canonical).cast("string")) != "")).count()
+        non_missing = df.filter(
+            F.col(canonical).isNotNull() & (F.trim(F.col(canonical).cast("string")) != "")
+        ).count()
         distinct = df.select(F.col(canonical).cast("string")).where(F.col(canonical).isNotNull()).distinct().count()
         categorical_summary.append({
             "field": canonical,
             "count": non_missing,
             "distinct": distinct,
-            "top_values": [{"value": row["value"], "count": int(row["count"]), "share": round(int(row["count"]) / non_missing, 4) if non_missing else 0} for row in counts],
+            "top_values": [
+                {
+                    "value": row["value"],
+                    "count": int(row["count"]),
+                    "share": round(int(row["count"]) / non_missing, 4) if non_missing else 0,
+                }
+                for row in counts
+            ],
         })
 
     duplicate_count = 0
     if df.columns and row_count:
         row_hash = F.sha2(F.to_json(F.struct(*[F.col(c) for c in df.columns])), 256)
-        duplicate_count = int(df.withColumn("_row_hash", row_hash).groupBy("_row_hash").count().filter(F.col("count") > 1).select(F.sum(F.col("count") - 1)).first()[0] or 0)
+        duplicate_count = int(
+            df.withColumn("_row_hash", row_hash)
+            .groupBy("_row_hash")
+            .count()
+            .filter(F.col("count") > 1)
+            .select(F.sum(F.col("count") - 1))
+            .first()[0]
+            or 0
+        )
 
     insights: list[dict[str, Any]] = []
     for item in missing:
         if item["rate"] >= 0.20:
-            insights.append({"type": "DATA_QUALITY", "severity": "WARNING", "title": f"High missingness in {item['field']}", "evidence": f"{item['missing']:,} of {row_count:,} rows are missing for this mapped field."})
+            insights.append({
+                "type": "DATA_QUALITY",
+                "severity": "WARNING",
+                "title": f"High missingness in {item['field']}",
+                "evidence": f"{item['missing']:,} of {row_count:,} rows are missing for this mapped field.",
+            })
     if duplicate_count:
-        insights.append({"type": "DATA_QUALITY", "severity": "WARNING", "title": "Duplicate records detected", "evidence": f"{duplicate_count:,} duplicate rows were observed ({duplicate_count / row_count:.1%} of the dataset)."})
+        insights.append({
+            "type": "DATA_QUALITY",
+            "severity": "WARNING",
+            "title": "Duplicate records detected",
+            "evidence": f"{duplicate_count:,} duplicate rows were observed ({duplicate_count / row_count:.1%} of the dataset).",
+        })
 
     attrition_source = "attrition" if "attrition" in canonical_fields else None
     if attrition_source:
@@ -150,7 +193,12 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
         total = df.filter(F.col(attrition_source).isNotNull() & (F.trim(F.col(attrition_source).cast("string")) != "")).count()
         positive = df.filter(labels.isin("yes", "y", "true", "1", "left", "terminated", "attrition")).count()
         if total and positive:
-            insights.append({"type": "WORKFORCE", "severity": "INFO", "title": "Attrition signal available", "evidence": f"{positive:,} of {total:,} non-empty attrition labels are in the positive class ({positive / total:.1%})."})
+            insights.append({
+                "type": "WORKFORCE",
+                "severity": "INFO",
+                "title": "Attrition signal available",
+                "evidence": f"{positive:,} of {total:,} non-empty attrition labels are in the positive class ({positive / total:.1%}).",
+            })
 
     return {
         "row_count": row_count,
