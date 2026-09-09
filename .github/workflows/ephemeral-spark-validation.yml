@@ -25,11 +25,15 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install Python and Java
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Java
         run: |
           sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3.11 python3.11-venv openjdk-17-jre-headless
-          python3.11 --version
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-17-jre-headless
           java -version
 
       - name: Start ephemeral Spark cluster
@@ -50,7 +54,7 @@ jobs:
 
       - name: Install validation dependencies
         run: |
-          python3.11 -m venv .venv
+          python -m venv .venv
           . .venv/bin/activate
           python -m pip install --upgrade pip
           pip install -e '.[dev,bigdata]'
@@ -58,7 +62,7 @@ jobs:
       - name: Wait for Spark master and worker
         run: |
           for attempt in $(seq 1 30); do
-            if python3.11 - <<'PY'
+            if python - <<'PY'
           import socket
           with socket.create_connection(('127.0.0.1', 7077), timeout=2):
               print('Spark master reachable')
@@ -68,7 +72,7 @@ jobs:
             fi
             sleep 2
           done
-          python3.11 - <<'PY'
+          python - <<'PY'
           import socket
           with socket.create_connection(('127.0.0.1', 7077), timeout=5):
               print('Spark master TCP endpoint reachable from the runner')
