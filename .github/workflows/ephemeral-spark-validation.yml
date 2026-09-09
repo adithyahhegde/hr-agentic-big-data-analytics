@@ -24,15 +24,15 @@ jobs:
     services:
       spark-master:
         image: apache/spark:3.5.8-python3
-        command: /bin/bash -lc "/opt/spark/sbin/start-master.sh && tail -f /dev/null"
+        command: ["/opt/spark/sbin/start-master.sh"]
         options: >-
-          --health-cmd "bash -lc '</dev/tcp/127.0.0.1/7077'"
+          --health-cmd "bash -lc 'cat < /dev/null > /dev/tcp/127.0.0.1/7077'"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 20
       spark-worker:
         image: apache/spark:3.5.8-python3
-        command: /bin/bash -lc "/opt/spark/sbin/start-worker.sh spark://spark-master:7077 && tail -f /dev/null"
+        command: ["/opt/spark/sbin/start-worker.sh", "spark://spark-master:7077"]
         env:
           SPARK_WORKER_CORES: '2'
           SPARK_WORKER_MEMORY: 2g
@@ -61,15 +61,11 @@ jobs:
           pip install -e '.[dev,bigdata]'
 
       - name: Wait for Spark worker registration
-        env:
-          SPARK_MASTER_URL: spark://spark-master:7077
         run: |
           for attempt in $(seq 1 30); do
             if python3.11 - <<'PY'
           import socket
-          host = 'spark-master'
-          port = 7077
-          with socket.create_connection((host, port), timeout=2):
+          with socket.create_connection(('spark-master', 7077), timeout=2):
               print('Spark master reachable')
           PY
             then
