@@ -1,0 +1,51 @@
+name: External Spark Validation
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: external-spark-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      HR_ANALYTICS_SPARK_MASTER: ${{ secrets.HR_ANALYTICS_SPARK_MASTER }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Require a non-local target cluster
+        run: |
+          test -n "$HR_ANALYTICS_SPARK_MASTER" || { echo 'HR_ANALYTICS_SPARK_MASTER is required for this manual validation gate.'; exit 1; }
+          case "$HR_ANALYTICS_SPARK_MASTER" in
+            spark://localhost:*|spark://127.0.0.1:*|spark://\[::1\]:*) echo 'Local/loopback Spark masters are not accepted.'; exit 1;;
+          esac
+      - name: Install validation dependencies
+        run: python -m pip install --upgrade pip && pip install -e '.[dev,bigdata]'
+      - name: Run external Spark protocol
+        run: python scripts/external_spark_validation.py --sizes 100 1000 10000 --seed 42 --output artifacts/external-spark.json
+      - name: Validate evidence artifact
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('artifacts/external-spark.json')
+          data = json.loads(p.read_text())
+          assert data['protocol_version'] == 'external_spark_scalability_v2'
+          assert data['seed'] == 42
+          assert [m['rows'] for m in data['measurements']] == [100, 1000, 10000]
+          assert all(m['validation']['distributed'] for m in data['measurements'])
+          assert all(not m['validation']['raw_rows_returned'] for m in data['measurements'])
+          assert all(m['validation']['verified'] for m in data['measurements'])
+          print('External Spark evidence artifact verified.')
+          PY
+      - name: Upload validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-spark-validation
+          path: artifacts/external-spark.json
