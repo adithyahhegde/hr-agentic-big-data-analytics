@@ -36,12 +36,18 @@ jobs:
           from pathlib import Path
           p = Path('artifacts/external-spark.json')
           data = json.loads(p.read_text())
-          assert data['protocol_version'] == 'external_spark_scalability_v2'
+          assert data['protocol'] == 'external_spark_scalability_v2'
           assert data['seed'] == 42
-          assert [m['rows'] for m in data['measurements']] == [100, 1000, 10000]
-          assert all(m['validation']['distributed'] for m in data['measurements'])
-          assert all(not m['validation']['raw_rows_returned'] for m in data['measurements'])
-          assert all(m['validation']['verified'] for m in data['measurements'])
+          assert data['sizes'] == [100, 1000, 10000]
+          assert [m['rows'] for m in data['runs']] == data['sizes']
+          for measurement in data['runs']:
+              validation = measurement['validation']
+              assert validation['row_count_matches_fixture'] is True
+              assert validation['distributed'] is True
+              assert validation['raw_rows_returned'] is False
+              assert validation['aggregates_match_local_baseline'] is True
+              assert measurement['elapsed_seconds'] >= 0
+              assert measurement['rows_per_second'] > 0
           print('External Spark evidence artifact verified.')
           PY
       - name: Upload validation artifact
