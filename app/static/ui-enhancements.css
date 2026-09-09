@@ -1,0 +1,39 @@
+:root{--ui-ink:#14282a;--ui-muted:#687873;--ui-line:#d7ddd8;--ui-surface:#fffdf9;--ui-soft:#eef5f0;--ui-accent:#2e6b5f;--ui-shadow:0 18px 50px rgba(16,43,46,.08)}
+html{scroll-behavior:smooth}
+body{background:radial-gradient(circle at 88% 8%,rgba(216,233,223,.38),transparent 28%),#f4f1eb}
+.topbar{backdrop-filter:blur(14px);background:rgba(251,250,247,.88)}
+.step-panel{animation:ui-enter .34s ease both}
+.hero-editorial{position:relative;padding:10px 0 4px}
+.hero-editorial:after{content:"";position:absolute;right:0;bottom:0;width:38%;height:1px;background:linear-gradient(90deg,transparent,var(--ui-line))}
+.hero-points span,.upload-meta span{transition:transform .18s ease,border-color .18s ease,background .18s ease}
+.hero-points span:hover,.upload-meta span:hover{transform:translateY(-2px);border-color:#91aaa0;background:#fff}
+.dropzone{border-radius:18px;box-shadow:var(--ui-shadow);position:relative;overflow:hidden}
+.dropzone:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 0,rgba(216,233,223,.32),transparent 45%);pointer-events:none}
+.dropzone.dragging{transform:scale(1.006);box-shadow:0 22px 60px rgba(31,75,73,.14)}
+.upload-icon{border-radius:14px;background:var(--ui-soft);transition:transform .2s ease}
+.dropzone:hover .upload-icon,.dropzone.dragging .upload-icon{transform:translateY(-3px) scale(1.04)}
+.primary,.secondary,.file-button{border-radius:10px}
+.primary{box-shadow:0 8px 18px rgba(16,43,46,.12)}
+.primary:focus-visible,.secondary:focus-visible,.file-button:focus-visible,.nav-step:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid rgba(46,107,95,.3);outline-offset:3px}
+.primary:not(:disabled):active,.secondary:not(:disabled):active{transform:translateY(1px)}
+.panel,.metric-card,.task-card,.insight{border-radius:14px;box-shadow:0 8px 26px rgba(20,40,42,.035)}
+.metric-card{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.metric-card:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(20,40,42,.08);border-color:#bcc9c2}
+.task-card{position:relative;overflow:hidden}
+.task-card.ready:after{content:"";position:absolute;right:-22px;top:-22px;width:70px;height:70px;border-radius:50%;background:rgba(216,233,223,.55)}
+.insight{transition:transform .18s ease,box-shadow .18s ease}
+.insight:hover{transform:translateY(-3px);box-shadow:0 14px 34px rgba(20,40,42,.08)}
+.evidence-hero,.understanding-banner{border-radius:14px;box-shadow:var(--ui-shadow)}
+.schema-details summary{transition:background .16s ease}
+.schema-details summary:hover{background:#f6f8f4}
+.status{min-height:24px;display:flex;align-items:center}
+.status:empty{min-height:0}
+.spinner{animation:spin .7s linear infinite}
+.toast-stack{position:fixed;right:22px;bottom:22px;z-index:100;display:grid;gap:9px;max-width:min(380px,calc(100vw - 36px))}
+.ui-toast{background:#142f31;color:#eef6f2;border:1px solid #315955;border-radius:12px;padding:11px 13px;box-shadow:0 18px 42px rgba(16,43,46,.2);font-size:11px;display:flex;gap:9px;align-items:flex-start;animation:toast-in .24s ease both}
+.ui-toast[data-kind="error"]{border-color:#a36a5f}.ui-toast strong{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px}.ui-toast button{margin-left:auto;border:0;background:transparent;color:inherit;cursor:pointer;font-size:15px;line-height:1}
+.ui-skip{position:fixed;left:12px;top:12px;transform:translateY(-160%);z-index:200;background:#fff;padding:9px 12px;border-radius:9px;border:1px solid var(--ui-line);box-shadow:var(--ui-shadow);font-size:11px;font-weight:800;color:var(--ui-ink);text-decoration:none}.ui-skip:focus{transform:none}
+@keyframes ui-enter{from{opacity:.2;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(max-width:720px){.toast-stack{right:12px;bottom:12px}.ui-toast{font-size:10px}.dropzone{border-radius:14px}.primary,.secondary,.file-button{min-height:42px}.ml-button{min-height:42px}.step-panel{overflow:hidden}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.step-panel,.ui-toast{animation:none}.metric-card,.insight,.task-card,.dropzone,.upload-icon,.hero-points span,.upload-meta span,.primary,.secondary{transition:none}.spinner{animation:none}}
