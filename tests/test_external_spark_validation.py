@@ -12,6 +12,15 @@ EXTERNAL_WORKFLOW = (ROOT / ".github" / "workflows" / "external-spark-validation
 EVALUATION_WORKFLOW = (ROOT / ".github" / "workflows" / "evaluation.yml").read_text(encoding="utf-8")
 
 
+def _aggregate_contract():
+    return {
+        "duplicate_row_count": 0,
+        "numeric_summary": [],
+        "categorical_summary": [],
+        "missing_by_field": [],
+    }
+
+
 def test_external_validation_requires_explicit_master(monkeypatch):
     monkeypatch.delenv("HR_ANALYTICS_SPARK_MASTER", raising=False)
     with pytest.raises(ValueError, match="HR_ANALYTICS_SPARK_MASTER"):
@@ -45,11 +54,12 @@ def test_external_validation_strips_master_whitespace(monkeypatch):
     def fake_analyze(*args, **kwargs):
         assert kwargs["master"] == "spark://example:7077"
         assert kwargs["stop_session"] is True
-        return {"row_count": 10, "execution": {"distributed": True, "raw_rows_returned": False}}
+        return {"row_count": 10, **_aggregate_contract(), "execution": {"distributed": True, "raw_rows_returned": False}}
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     result = validate(rows=10, master="  spark://example:7077  ")
     assert result["validation"]["distributed"] is True
+    assert result["validation"]["aggregates_match_local_baseline"] is True
 
 
 def test_external_validation_protocol_has_bounded_defaults():
@@ -59,6 +69,7 @@ def test_external_validation_protocol_has_bounded_defaults():
     assert signature.parameters["rows"].default == 10_000
     assert signature.parameters["seed"].default == 42
     assert external_validation.DEFAULT_SIZES == (100, 1_000, 10_000)
+    assert external_validation.MAX_VALIDATION_ROWS == 100_000
     assert external_validation.PROTOCOL_VERSION == "external_spark_scalability_v2"
 
 
@@ -67,13 +78,18 @@ def test_external_validation_rejects_invalid_sizes(monkeypatch):
         validate_sizes(sizes=[0, 10], master="spark://example:7077")
 
 
+def test_external_validation_rejects_unbounded_sizes():
+    with pytest.raises(ValueError, match="100,000"):
+        validate_sizes(sizes=[100_001], master="spark://example:7077")
+
+
 def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
     calls = []
 
     def fake_analyze(path_lines, mappings, **kwargs):
         rows = len(path_lines) - 1
         calls.append((rows, kwargs["master"], kwargs["stop_session"], path_lines[0]))
-        return {"row_count": rows, "execution": {"distributed": True, "raw_rows_returned": False}}
+        return {"row_count": rows, **_aggregate_contract(), "execution": {"distributed": True, "raw_rows_returned": False}}
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     result = validate_sizes(sizes=[1000, 100, 1000], seed=42, master="spark://example:7077")
@@ -94,7 +110,7 @@ def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
 def test_external_validation_fixture_fingerprint_is_reproducible(monkeypatch):
     def fake_analyze(*args, **kwargs):
         rows = len(args[0]) - 1
-        return {"row_count": rows, "execution": {"distributed": True, "raw_rows_returned": False}}
+        return {"row_count": rows, **_aggregate_contract(), "execution": {"distributed": True, "raw_rows_returned": False}}
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     first = validate_sizes(sizes=[100], seed=42, master="spark://example:7077")
@@ -107,6 +123,7 @@ def test_external_validation_preserves_cluster_provenance(monkeypatch):
     def fake_analyze(*args, **kwargs):
         return {
             "row_count": 10,
+            **_aggregate_contract(),
             "execution": {
                 "distributed": True,
                 "raw_rows_returned": False,
@@ -130,6 +147,7 @@ def test_external_validation_requires_distributed_and_non_raw_result(monkeypatch
     def fake_analyze(*args, **kwargs):
         return {
             "row_count": 10,
+            **_aggregate_contract(),
             "execution": {"distributed": False, "raw_rows_returned": False},
         }
 
@@ -142,6 +160,7 @@ def test_external_validation_rejects_raw_rows(monkeypatch):
     def fake_analyze(*args, **kwargs):
         return {
             "row_count": 10,
+            **_aggregate_contract(),
             "execution": {"distributed": True, "raw_rows_returned": True},
         }
 
@@ -150,17 +169,27 @@ def test_external_validation_rejects_raw_rows(monkeypatch):
         validate(rows=10, master="spark://example:7077")
 
 
+def test_external_validation_requires_aggregate_fields(monkeypatch):
+    def fake_analyze(*args, **kwargs):
+        return {"row_count": 10, "execution": {"distributed": True, "raw_rows_returned": False}}
+
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
+    with pytest.raises(RuntimeError, match="missing required aggregate fields"):
+        validate(rows=10, master="spark://example:7077")
+
+
 def test_external_validation_returns_verified_contract(monkeypatch):
     def fake_analyze(*args, **kwargs):
         return {
             "row_count": 10,
+            **_aggregate_contract(),
             "execution": {"distributed": True, "raw_rows_returned": False},
-            "numeric_summary": {},
         }
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
     result = validate(rows=10, seed=42, master="spark://example:7077")
     assert result["validation"]["distributed"] is True
+    assert result["validation"]["aggregates_match_local_baseline"] is True
     assert result["rows"] == 10
     assert result["elapsed_seconds"] >= 0
     assert result["rows_per_second"] > 0
@@ -183,7 +212,7 @@ def test_external_validation_rejects_aggregate_mismatch(monkeypatch):
         validate(rows=10, seed=42, master="spark://example:7077")
 
 
-def test_external_validation_accepts_matching_aggregate_baseline(monkeypatch):
+def test_external_validation_accepts_matching_aggregate_baseline():
     result = external_validation._validate_result(
         {
             "row_count": 1,
