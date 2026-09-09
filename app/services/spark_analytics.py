@@ -18,6 +18,24 @@ def _spark_session(master: str | None = None):
     )
 
 
+def _execution_metadata(spark, *, distributed: bool, input_mode: str | None = None) -> dict[str, Any]:
+    """Return bounded Spark provenance useful for reproducible validation."""
+    context = spark.sparkContext
+    metadata: dict[str, Any] = {
+        "engine": "SPARK",
+        "distributed": distributed,
+        "raw_rows_returned": False,
+        "spark_version": getattr(spark, "version", None),
+        "default_parallelism": int(context.defaultParallelism),
+    }
+    application_id = getattr(context, "applicationId", None)
+    if application_id:
+        metadata["application_id"] = application_id
+    if input_mode is not None:
+        metadata["input_mode"] = input_mode
+    return metadata
+
+
 def _number_columns(df, canonical_to_source: dict[str, str]) -> dict[str, str]:
     numeric_types = {"tinyint", "smallint", "int", "bigint", "float", "double", "decimal"}
     result: dict[str, str] = {}
@@ -32,7 +50,7 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
     """Run the bounded descriptive aggregation over an existing Spark DataFrame."""
     from pyspark.sql import functions as F
 
-    source_to_canonical = {source: canonical for source, canonical in mappings.items() if canonical != "unknown"}
+    source_to_canonical = {source: canonical for canonical, source in mappings.items() if canonical != "unknown"}
     canonical_to_source = {canonical: source for source, canonical in source_to_canonical.items()}
     row_count = df.count()
 
@@ -112,33 +130,27 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
         "categorical_summary": categorical_summary,
         "missing_by_field": sorted(missing, key=lambda item: item["field"]),
         "insights": insights,
-        "execution": {"engine": "SPARK", "distributed": True, "raw_rows_returned": False},
     }
 
 
 def analyze_spark(path: Path, mappings: dict[str, str], max_categories: int = 5, master: str | None = None) -> dict[str, Any]:
-    """Distributed descriptive analytics. Only bounded aggregates are collected.
-
-    ``master`` is optional for controlled target-environment validation. When it is
-    omitted, ``HR_ANALYTICS_SPARK_MASTER`` is used and otherwise the safe local[*]
-    default is retained. No cluster endpoint is persisted in analytical results.
-    """
+    """Distributed descriptive analytics. Only bounded aggregates are collected."""
     spark = _spark_session(master)
+    configured_master = master or os.getenv("HR_ANALYTICS_SPARK_MASTER") or "local[*]"
     df = spark.read.option("header", True).option("inferSchema", True).csv(str(path))
     result = _analyze_dataframe(df, mappings, max_categories=max_categories)
-    result["execution"]["distributed"] = not (master or os.getenv("HR_ANALYTICS_SPARK_MASTER", "local[*]")).startswith("local")
+    result["execution"] = _execution_metadata(
+        spark,
+        distributed=not configured_master.startswith("local"),
+        input_mode="path",
+    )
     return result
 
 
 def analyze_spark_csv_lines(lines: Iterable[str], mappings: dict[str, str], max_categories: int = 5, master: str | None = None) -> dict[str, Any]:
-    """Analyze CSV text without requiring an executor to access the driver's filesystem.
-
-    The bounded external-cluster validation protocol uses this path because a
-    driver-local temporary file is not a portable input source for a multi-node
-    Spark deployment. CSV lines are transferred to the configured Spark cluster
-    through an RDD, then the same DataFrame aggregation logic is used.
-    """
+    """Analyze CSV text without requiring executor access to a driver's filesystem."""
     spark = _spark_session(master)
+    configured_master = master or os.getenv("HR_ANALYTICS_SPARK_MASTER") or "local[*]"
     materialized = list(lines)
     if not materialized:
         raise ValueError("CSV input must contain at least a header row")
@@ -146,6 +158,9 @@ def analyze_spark_csv_lines(lines: Iterable[str], mappings: dict[str, str], max_
     rdd = spark.sparkContext.parallelize(materialized, parallelism)
     df = spark.read.option("header", True).option("inferSchema", True).csv(rdd)
     result = _analyze_dataframe(df, mappings, max_categories=max_categories)
-    result["execution"]["distributed"] = not (master or os.getenv("HR_ANALYTICS_SPARK_MASTER", "local[*]")).startswith("local")
-    result["execution"]["input_mode"] = "driver_parallelized_csv"
+    result["execution"] = _execution_metadata(
+        spark,
+        distributed=not configured_master.startswith("local"),
+        input_mode="driver_parallelized_csv",
+    )
     return result

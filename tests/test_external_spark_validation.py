@@ -80,6 +80,29 @@ def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
     assert all(call[2].startswith("employee_id,") for call in calls)
 
 
+def test_external_validation_preserves_cluster_provenance(monkeypatch):
+    def fake_analyze(*args, **kwargs):
+        return {
+            "row_count": 10,
+            "execution": {
+                "distributed": True,
+                "raw_rows_returned": False,
+                "spark_version": "4.0.0",
+                "default_parallelism": 4,
+                "application_id": "app-123",
+                "input_mode": "driver_parallelized_csv",
+            },
+        }
+
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
+    result = validate(rows=10, master="spark://example:7077")
+    execution = result["result"]["execution"]
+    assert execution["spark_version"] == "4.0.0"
+    assert execution["default_parallelism"] == 4
+    assert execution["application_id"] == "app-123"
+    assert execution["input_mode"] == "driver_parallelized_csv"
+
+
 def test_external_validation_requires_distributed_and_non_raw_result(monkeypatch):
     def fake_analyze(*args, **kwargs):
         return {
