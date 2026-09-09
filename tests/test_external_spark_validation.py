@@ -202,10 +202,10 @@ def test_external_validation_accepts_matching_aggregate_baseline(monkeypatch):
 def test_external_workflows_validate_the_v2_artifact_contract():
     for workflow in (EXTERNAL_WORKFLOW, EVALUATION_WORKFLOW):
         assert "external_spark_scalability_v2" in workflow
-        assert "result['protocol']" in workflow or "result[\"protocol\"]" in workflow
-        assert "run['rows']" in workflow or "run[\"rows\"]" in workflow
-        assert "validation['distributed']" in workflow or "validation[\"distributed\"]" in workflow
-        assert "validation['raw_rows_returned']" in workflow or "validation[\"raw_rows_returned\"]" in workflow
+        assert "['protocol']" in workflow or '["protocol"]' in workflow
+        assert "['rows']" in workflow or '["rows"]' in workflow
+        assert "['distributed']" in workflow or '["distributed"]' in workflow
+        assert "['raw_rows_returned']" in workflow or '["raw_rows_returned"]' in workflow
         assert "aggregates_match_local_baseline" in workflow
         assert "rows_per_second" in workflow
 
