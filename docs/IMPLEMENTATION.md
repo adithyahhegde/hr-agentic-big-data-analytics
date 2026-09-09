@@ -87,6 +87,8 @@
 - [x] Restart-recoverable dataset/profile/schema state when local data storage persists.
 - [x] Authenticated multi-user dataset lifecycle and owner isolation using per-user API credentials.
 - [x] Owner isolation applied to cached datasets, analytical run history, explanations, and durable agent workflows.
+- [x] Modern interaction layer: accessible landmarks, keyboard-reachable upload, focus-visible states, reduced-motion support, responsive touch targets, and non-blocking status/toast feedback.
+- [x] Static UI contract tests covering workflow structure and accessibility interaction requirements.
 
 ## Phase 10 — Evaluation
 - [x] Benchmark fixture generator.
