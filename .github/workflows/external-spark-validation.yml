@@ -29,10 +29,11 @@ jobs:
       - name: Preflight target connectivity
         run: |
           python - <<'PY'
+          import os
           import socket
           from urllib.parse import urlsplit
 
-          master = "$HR_ANALYTICS_SPARK_MASTER".strip()
+          master = os.environ["HR_ANALYTICS_SPARK_MASTER"].strip()
           parsed = urlsplit(master)
           if parsed.scheme != "spark" or not parsed.hostname or parsed.port is None:
               raise SystemExit("HR_ANALYTICS_SPARK_MASTER must be spark://host:port")
