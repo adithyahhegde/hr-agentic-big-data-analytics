@@ -92,11 +92,20 @@ jobs:
             exit 1
           fi
 
+      - name: Configure routable Spark driver endpoint
+        run: |
+          set -euo pipefail
+          RUNNER_IP=$(hostname -I | awk '{print $1}')
+          test -n "$RUNNER_IP"
+          case "$RUNNER_IP" in
+            127.*|0.0.0.0|::1) echo "No routable runner address: $RUNNER_IP"; exit 1 ;;
+          esac
+          echo "HR_ANALYTICS_SPARK_MASTER=spark://${RUNNER_IP}:7077" >> "$GITHUB_ENV"
+          echo "HR_ANALYTICS_SPARK_DRIVER_HOST=host.docker.internal" >> "$GITHUB_ENV"
+          echo "HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS=0.0.0.0" >> "$GITHUB_ENV"
+          echo "Using runner address $RUNNER_IP for Spark master endpoint"
+
       - name: Run external Spark protocol against ephemeral cluster
-        env:
-          HR_ANALYTICS_SPARK_MASTER: spark://127.0.0.1:7077
-          HR_ANALYTICS_SPARK_DRIVER_HOST: host.docker.internal
-          HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS: 0.0.0.0
         run: |
           . .venv/bin/activate
           mkdir -p artifacts
