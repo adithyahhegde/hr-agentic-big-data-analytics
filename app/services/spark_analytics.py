@@ -28,11 +28,28 @@ def _number_columns(df, canonical_to_source: dict[str, str]) -> dict[str, str]:
     return result
 
 
+def _execution_metadata(spark, *, distributed: bool, input_mode: str | None = None) -> dict[str, Any]:
+    """Return bounded Spark provenance that is useful for reproducible validation."""
+    metadata: dict[str, Any] = {
+        "engine": "SPARK",
+        "distributed": distributed,
+        "raw_rows_returned": False,
+        "spark_version": getattr(spark, "version", None),
+        "default_parallelism": int(spark.sparkContext.defaultParallelism),
+    }
+    application_id = getattr(spark.sparkContext, "applicationId", None)
+    if application_id:
+        metadata["application_id"] = application_id
+    if input_mode is not None:
+        metadata["input_mode"] = input_mode
+    return metadata
+
+
 def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) -> dict[str, Any]:
     """Run the bounded descriptive aggregation over an existing Spark DataFrame."""
     from pyspark.sql import functions as F
 
-    source_to_canonical = {source: canonical for source, canonical in mappings.items() if canonical != "unknown"}
+    source_to_canonical = {source: canonical for canonical, source in mappings.items() if canonical != "unknown"}
     canonical_to_source = {canonical: source for source, canonical in source_to_canonical.items()}
     row_count = df.count()
 
@@ -112,7 +129,6 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
         "categorical_summary": categorical_summary,
         "missing_by_field": sorted(missing, key=lambda item: item["field"]),
         "insights": insights,
-        "execution": {"engine": "SPARK", "distributed": True, "raw_rows_returned": False},
     }
 
 
@@ -126,7 +142,10 @@ def analyze_spark(path: Path, mappings: dict[str, str], max_categories: int = 5,
     spark = _spark_session(master)
     df = spark.read.option("header", True).option("inferSchema", True).csv(str(path))
     result = _analyze_dataframe(df, mappings, max_categories=max_categories)
-    result["execution"]["distributed"] = not (master or os.getenv("HR_ANALYTICS_SPARK_MASTER", "local[*]")).startswith("local")
+    result["execution"] = _execution_metadata(
+        spark,
+        distributed=not (master or os.getenv("HR_ANALYTICS_SPARK_MASTER", "local[*]")).startswith("local"),
+    )
     return result
 
 
@@ -146,6 +165,5 @@ def analyze_spark_csv_lines(lines: Iterable[str], mappings: dict[str, str], max_
     rdd = spark.sparkContext.parallelize(materialized, parallelism)
     df = spark.read.option("header", True).option("inferSchema", True).csv(rdd)
     result = _analyze_dataframe(df, mappings, max_categories=max_categories)
-    result["execution"]["distributed"] = not (master or os.getenv("HR_ANALYTICS_SPARK_MASTER", "local[*]")).startswith("local")
-    result["execution"]["input_mode"] = "driver_parallelized_csv"
+    result["execution"] = _execution_metadata(spark, distributed=not (master or os.getenv("HR_ANALYTICS_SPARK_MASTER", "local[*]")).startswith("local"), input_mode="driver_parallelized_csv")
     return result
