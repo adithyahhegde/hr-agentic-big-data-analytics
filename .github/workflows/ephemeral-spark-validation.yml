@@ -19,12 +19,13 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    container:
-      image: node:20-bookworm
     services:
       spark-master:
         image: apache/spark:3.5.8-python3
-        command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master", "--host", "spark-master", "--port", "7077", "--webui-port", "8080"]
+        ports:
+          - 7077:7077
+          - 8080:8080
+        command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master", "--host", "0.0.0.0", "--port", "7077", "--webui-port", "8080"]
       spark-worker:
         image: apache/spark:3.5.8-python3
         command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077", "--cores", "2", "--memory", "2g"]
@@ -35,8 +36,8 @@ jobs:
 
       - name: Install Python and Java
         run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3.11 python3.11-venv openjdk-17-jre-headless
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3.11 python3.11-venv openjdk-17-jre-headless
           python3.11 --version
           java -version
 
@@ -47,12 +48,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e '.[dev,bigdata]'
 
-      - name: Wait for Spark worker registration
+      - name: Wait for Spark master
         run: |
           for attempt in $(seq 1 30); do
             if python3.11 - <<'PY'
           import socket
-          with socket.create_connection(('spark-master', 7077), timeout=2):
+          with socket.create_connection(('127.0.0.1', 7077), timeout=2):
               print('Spark master reachable')
           PY
             then
@@ -62,15 +63,15 @@ jobs:
           done
           python3.11 - <<'PY'
           import socket
-          with socket.create_connection(('spark-master', 7077), timeout=5):
-              print('Spark master TCP endpoint reachable from the job container')
+          with socket.create_connection(('127.0.0.1', 7077), timeout=5):
+              print('Spark master TCP endpoint reachable from the runner')
           PY
 
       - name: Run external Spark protocol against ephemeral cluster
         run: |
           . .venv/bin/activate
           mkdir -p artifacts
-          HR_ANALYTICS_SPARK_MASTER=spark://spark-master:7077 \
+          HR_ANALYTICS_SPARK_MASTER=spark://127.0.0.1:7077 \
             python scripts/external_spark_validation.py \
               --sizes 100 1000 10000 \
               --seed 42 \
