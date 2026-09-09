@@ -36,10 +36,12 @@ def test_ephemeral_spark_workflow_validates_readiness_and_cleans_up():
     assert "docker network rm hr-spark-ci || true" in WORKFLOW
 
 
-def test_ephemeral_spark_workflow_configures_driver_reachability_and_evidence_contract():
-    assert "HR_ANALYTICS_SPARK_MASTER: spark://127.0.0.1:7077" in WORKFLOW
-    assert "HR_ANALYTICS_SPARK_DRIVER_HOST: host.docker.internal" in WORKFLOW
-    assert "HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS: 0.0.0.0" in WORKFLOW
+def test_ephemeral_spark_workflow_configures_routable_driver_and_evidence_contract():
+    assert "RUNNER_IP=$(hostname -I | awk '{print $1}')" in WORKFLOW
+    assert "case \"$RUNNER_IP\" in" in WORKFLOW
+    assert "HR_ANALYTICS_SPARK_MASTER=spark://${RUNNER_IP}:7077" in WORKFLOW
+    assert "HR_ANALYTICS_SPARK_DRIVER_HOST=host.docker.internal" in WORKFLOW
+    assert "HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS=0.0.0.0" in WORKFLOW
     assert "external_spark_scalability_v2" in WORKFLOW
     assert "aggregates_match_local_baseline" in WORKFLOW
     assert "raw_rows_returned" in WORKFLOW
