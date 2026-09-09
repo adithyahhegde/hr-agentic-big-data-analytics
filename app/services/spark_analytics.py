@@ -11,13 +11,23 @@ def _spark_session(master: str | None = None):
     from pyspark.sql import SparkSession
 
     configured_master = master or os.getenv("HR_ANALYTICS_SPARK_MASTER") or "local[*]"
-    return (
+    builder = (
         SparkSession.builder
         .appName("hr-agentic-big-data-analytics")
         .master(configured_master)
         .config("spark.sql.shuffle.partitions", os.getenv("HR_ANALYTICS_SPARK_SHUFFLE_PARTITIONS", "200"))
-        .getOrCreate()
     )
+    # When the driver runs outside a remote Spark worker network (for example,
+    # a hosted CI runner talking to Dockerized Spark), the executor must be
+    # given an address that it can actually reach. Keep this opt-in so normal
+    # local execution retains Spark's default driver discovery.
+    driver_host = os.getenv("HR_ANALYTICS_SPARK_DRIVER_HOST")
+    if driver_host:
+        builder = builder.config("spark.driver.host", driver_host)
+    driver_bind_address = os.getenv("HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS")
+    if driver_bind_address:
+        builder = builder.config("spark.driver.bindAddress", driver_bind_address)
+    return builder.getOrCreate()
 
 
 def _execution_metadata(spark, *, distributed: bool, input_mode: str | None = None) -> dict[str, Any]:
@@ -132,8 +142,6 @@ def _analyze_dataframe(df, mappings: dict[str, str], max_categories: int = 5) ->
     for canonical in sorted(canonical_fields):
         if canonical in numeric_fields:
             continue
-        # Keep the aggregation expression on one logical statement. This is
-        # easier to inspect and avoids parser-sensitive multiline grouping.
         counts = df.filter(F.col(canonical).isNotNull()).groupBy(
             F.col(canonical).cast("string").alias("value")
         ).count().orderBy(F.desc("count"), F.asc("value")).limit(max_categories).collect()
