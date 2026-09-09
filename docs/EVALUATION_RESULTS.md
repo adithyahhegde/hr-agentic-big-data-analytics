@@ -2,7 +2,7 @@
 
 ## CI evidence
 
-The reproducible evaluation workflow completed successfully on 2026-09-08 UTC for commit `c86e337b1ca1a6dcfbf6a8f92f1963fce33c586d` (GitHub Actions run `34212312393`). The run executed objective feasibility, schema mapping, bounded agent reliability, the 30-case robustness matrix, local scalability, and the SHAP explainability smoke test. The generated JSON artifact was retained by GitHub Actions for 30 days.
+The reproducible evaluation workflow completed successfully on 2026-09-09 UTC for commit `de35df64715da79dd8396418b834a24b5c0f3536` (GitHub Actions run `34325958699`). The run executed objective feasibility, schema mapping, bounded agent reliability, the 30-case robustness matrix, local scalability, and the SHAP explainability smoke test. Spark was installed in the evaluation environment and the robustness benchmark's Spark comparison path was exercised using the configured local Spark master; this is not external-cluster evidence. The generated JSON artifact was retained by GitHub Actions for 30 days.
 
 This document records observed CI evidence from that run. It is not a claim that the results generalize to real HR datasets or external Spark clusters.
 
@@ -13,15 +13,17 @@ This document records observed CI evidence from that run. It is not a claim that
 | Objective feasibility | Pipeline accuracy `1.0`; weak baseline accuracy `0.7778` across 18 fixture/objective records | The pipeline matched the deterministic fixture-contract labels in this benchmark. The labels are synthetic evaluation assumptions, not real-world ground truth. |
 | Schema mapping | `104/106 = 0.9811` exact semantic mappings vs `92/106 = 0.8679` for the normalized-name-only baseline | The semantic mapper beat the intentionally weaker name-only baseline on the evaluated non-blocked fixture columns. Ambiguous and leakage-prone fixtures were correctly excluded from exact-mapping accuracy because the expected behaviour is abstention. |
 | Agent reliability | `7/7` safe scenarios; safety rate `1.0` | The bounded deterministic planner/synthesizer satisfied the tested bounds, provenance rejection, malformed-input rejection, abstention, and citation-integrity contracts. This is not an LLM-quality or human-agreement measurement. |
-| Robustness matrix | `30` fixture evaluations across 10 scenarios × 3 sizes; `24` accepted and `6` blocked by schema collision | Ambiguous and leakage-prone cases were blocked at all three sizes; the remaining fixture cases completed on the local path. Spark was unavailable in this runner, so no Spark/local consistency comparison was made. |
-| Local scalability | 100 rows: `0.001977s`, `50,584 rows/s`; 1,000 rows: `0.010824s`, `92,391 rows/s`; 10,000 rows: `0.110283s`, `90,676 rows/s` | The clean-fixture local descriptive path processed all three sizes successfully. The 100-row timing is small and therefore noisy; the 100× row increase produced a `55.783×` elapsed-time increase in this single-repeat CI run. These are environment-specific measurements, not performance guarantees. |
-| SHAP smoke test | CI step passed | Optional bounded SHAP explainability was exercised in the evaluation environment. The workflow currently records this as a test result rather than a standalone JSON metric. |
+| Robustness matrix | `30` fixture evaluations across 10 scenarios × 3 sizes; `24` accepted and `6` blocked by schema collision | Ambiguous and leakage-prone cases were blocked at all three sizes; the remaining fixture cases completed successfully. Spark was available in the runner for these cases, but used the local Spark master rather than an external target cluster. |
+| Local scalability | 100 rows: `0.001918s`, `52,145 rows/s`; 1,000 rows: `0.010553s`, `94,763 rows/s`; 10,000 rows: `0.106766s`, `93,663 rows/s` | The clean-fixture local descriptive path processed all three sizes successfully. The 100-row timing is small and therefore noisy; the 100× row increase produced a `55.665×` elapsed-time increase in this single-repeat CI run. These are environment-specific measurements, not performance guarantees. |
+| SHAP smoke test | CI step passed | Optional bounded SHAP explainability was exercised in the evaluation environment. The workflow records this as a test result rather than a standalone JSON metric. |
 
 ## External Spark validation status
 
-The evaluation workflow now contains a conditional external-Spark validation step that runs `scripts/external_spark_validation.py` only when the runner receives a non-empty `HR_ANALYTICS_SPARK_MASTER` value. On GitHub Actions run `34242439083` for commit `54292ec0b7188a6215e85604ac07b49074be592c`, the deterministic evaluation steps all succeeded, but the external-Spark step was **skipped**. The runner therefore did not receive a configured non-local Spark master for this run. No external-cluster scalability result is claimed.
+The repository contains a separate manual workflow, `.github/workflows/external-spark-validation.yml`, for the final target-environment gate. It requires the `HR_ANALYTICS_SPARK_MASTER` secret and rejects local/loopback masters. The protocol exercises 100, 1,000, and 10,000-row fixtures, transfers CSV lines through Spark rather than assuming shared executor filesystem access, verifies exact row counts and distributed execution, compares bounded aggregates with the deterministic local baseline, and never returns raw rows.
 
-The protocol remains intentionally strict: a valid external result must come from a reachable non-local Spark master and must verify the fixture row count, distributed execution, and absence of raw-row collection. A skipped workflow step is not evidence of scalability. The repository cannot manufacture this evidence without access to an actual target cluster.
+The latest reproducible evaluation run did **not** execute against an external cluster. Its Spark work used the runner's local Spark master. No external-cluster scalability result is claimed.
+
+A valid final result must come from a reachable non-local Spark master and must retain the generated `external-spark.json` artifact as evaluation evidence. A skipped external step or local Spark execution is not evidence of external scalability.
 
 ## Reproducibility
 
@@ -34,6 +36,6 @@ The protocol remains intentionally strict: a valid external result must come fro
 
 ## What remains unverified
 
-External Spark scalability remains unverified because the repository does not have a reachable non-local Spark cluster as part of CI. The local measurements above must not be presented as evidence that Spark is faster or that the system scales identically on a cluster.
+External Spark scalability remains unverified because the repository does not currently have evidence from a reachable non-local Spark cluster. The local measurements above must not be presented as evidence that Spark is faster or that the system scales identically on a cluster.
 
 The observed fixture results also do not establish generalization to real-world heterogeneous HR schemas, human approval quality, causal validity, or production HR decision performance.
