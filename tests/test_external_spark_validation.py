@@ -38,6 +38,7 @@ def test_external_validation_rejects_whitespace_only_master(monkeypatch):
 def test_external_validation_strips_master_whitespace(monkeypatch):
     def fake_analyze(*args, **kwargs):
         assert kwargs["master"] == "spark://example:7077"
+        assert kwargs["stop_session"] is True
         return {"row_count": 10, "execution": {"distributed": True, "raw_rows_returned": False}}
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
@@ -65,7 +66,7 @@ def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
 
     def fake_analyze(path_lines, mappings, **kwargs):
         rows = len(path_lines) - 1
-        calls.append((rows, kwargs["master"], path_lines[0]))
+        calls.append((rows, kwargs["master"], kwargs["stop_session"], path_lines[0]))
         return {"row_count": rows, "execution": {"distributed": True, "raw_rows_returned": False}}
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
@@ -80,7 +81,8 @@ def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
     assert calls[0][0] == 100
     assert calls[1][0] == 1000
     assert all(call[1] == "spark://example:7077" for call in calls)
-    assert all(call[2].startswith("employee_id,") for call in calls)
+    assert all(call[2] is True for call in calls)
+    assert all(call[3].startswith("employee_id,") for call in calls)
 
 
 def test_external_validation_fixture_fingerprint_is_reproducible(monkeypatch):
