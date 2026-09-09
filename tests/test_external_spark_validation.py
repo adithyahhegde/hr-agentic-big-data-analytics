@@ -100,6 +100,17 @@ def test_external_validation_rejects_unbounded_sizes():
         validate_sizes(sizes=[100_001], master="spark://example:7077")
 
 
+@pytest.mark.parametrize("rows", [0, -1, 100_001])
+def test_external_validation_public_validate_enforces_size_bounds(rows):
+    with pytest.raises(ValueError):
+        validate(rows=rows, master="spark://example:7077")
+
+
+def test_external_validation_public_validate_rejects_non_integer_rows():
+    with pytest.raises(ValueError, match="positive integers"):
+        validate(rows=True, master="spark://example:7077")
+
+
 def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
     _stub_local_baseline(monkeypatch)
     calls = []
