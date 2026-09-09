@@ -22,11 +22,11 @@ def _aggregate_contract():
 
 
 def _stub_local_baseline(monkeypatch):
-    monkeypatch.setattr(
-        external_validation,
-        "analyze_csv",
-        lambda *args, **kwargs: {"row_count": 1, **_aggregate_contract()},
-    )
+    def fake_local(path, mappings):
+        rows = sum(1 for _ in path.read_text(encoding="utf-8").splitlines()) - 1
+        return {"row_count": rows, **_aggregate_contract()}
+
+    monkeypatch.setattr(external_validation, "analyze_csv", fake_local)
 
 
 def test_external_validation_requires_explicit_master(monkeypatch):
