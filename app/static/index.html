@@ -6,12 +6,13 @@
   <meta name="description" content="Evidence-led HR analytics workspace for heterogeneous workforce datasets">
   <title>Workforce Intelligence</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/ui-enhancements.css">
 </head>
 <body>
 <div class="shell">
   <aside class="sidebar">
     <div class="brand"><span class="brand-mark">WI</span><div><strong>Workforce</strong><small>Intelligence Lab</small></div></div>
-    <nav>
+    <nav aria-label="Workspace steps">
       <div class="nav-title">WORKSPACE</div>
       <button class="nav-step active" data-step="1"><span>01</span><b>Dataset</b><em></em></button>
       <button class="nav-step" data-step="2"><span>02</span><b>Data health</b><em></em></button>
@@ -22,40 +23,40 @@
     <div class="sidebar-note"><b>Local by default</b><br>HR records remain inside this application for the core workflow. AI assistance is bounded to validated metadata and evidence.</div>
   </aside>
 
-  <main class="workspace">
-    <header class="topbar"><div><div class="eyebrow">WORKFORCE INTELLIGENCE / ANALYTICS</div><h1>Analytical workspace</h1></div><div id="connection" class="connection"><i></i> System ready</div></header>
+  <main class="workspace" id="main-content">
+    <header class="topbar"><div><div class="eyebrow">WORKFORCE INTELLIGENCE / ANALYTICS</div><h1>Analytical workspace</h1></div><div id="connection" class="connection" aria-live="polite"><i></i> System ready</div></header>
     <div class="mobile-progress" aria-label="Workflow progress"><span class="progress-line"></span><span class="progress-fill" id="progress-fill"></span><b>01</b><b>02</b><b>03</b><b>04</b><b>05</b></div>
 
-    <section id="step-1" class="step-panel active-panel">
-      <div class="hero hero-editorial"><div><div class="section-kicker">01 / DATASET INTAKE</div><h2>Bring the workforce data. We’ll work out what it can tell you.</h2><p>Upload a CSV and the workspace will inspect data quality, understand the schema, surface worthwhile investigations, and build evidence without exposing raw employee records to the synthesis layer.</p><div class="hero-points"><span>Schema-aware</span><span>Evidence-led</span><span>Local-first</span><span>Interactive</span></div></div><div class="hero-side"><span class="hero-side-label">DESIGNED FOR</span><strong>HR teams</strong><strong>Analysts</strong><strong>Data scientists</strong></div></div>
+    <section id="step-1" class="step-panel active-panel" aria-labelledby="step-1-title">
+      <div class="hero hero-editorial"><div><div class="section-kicker">01 / DATASET INTAKE</div><h2 id="step-1-title">Bring the workforce data. We’ll work out what it can tell you.</h2><p>Upload a CSV and the workspace will inspect data quality, understand the schema, surface worthwhile investigations, and build evidence without exposing raw employee records to the synthesis layer.</p><div class="hero-points"><span>Schema-aware</span><span>Evidence-led</span><span>Local-first</span><span>Interactive</span></div></div><div class="hero-side"><span class="hero-side-label">DESIGNED FOR</span><strong>HR teams</strong><strong>Analysts</strong><strong>Data scientists</strong></div></div>
       <form id="upload-form" class="dropzone">
-        <div class="upload-icon">↑</div><h3>Drop a CSV dataset</h3><p>or choose a file from your device</p>
+        <div class="upload-icon" aria-hidden="true">↑</div><h3>Drop a CSV dataset</h3><p>or choose a file from your device</p>
         <input id="dataset" name="file" type="file" accept=".csv,text/csv" required>
-        <label for="dataset" class="file-button">Browse files</label><div id="file-name" class="file-name">No file selected</div>
+        <label for="dataset" class="file-button">Browse files</label><div id="file-name" class="file-name" aria-live="polite">No file selected</div>
         <button type="submit" class="primary" id="analyze-upload">Start analysis <span>→</span></button>
         <div class="upload-meta"><span>CSV</span><span>Local processing</span><span>Progressive disclosure</span></div>
       </form>
       <div id="status" class="status" role="status" aria-live="polite"></div>
     </section>
 
-    <section id="step-2" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">02 / DATA HEALTH</div><h2>Before analysis, know what needs attention.</h2><p>Quality findings are separated from the original dataset. No silent cleanup is applied to your source file.</p></div><button class="secondary" data-back="1">← Back</button></div>
+    <section id="step-2" class="step-panel" hidden aria-labelledby="step-2-title">
+      <div class="section-head"><div><div class="section-kicker">02 / DATA HEALTH</div><h2 id="step-2-title">Before analysis, know what needs attention.</h2><p>Quality findings are separated from the original dataset. No silent cleanup is applied to your source file.</p></div><button class="secondary" data-back="1">← Back</button></div>
       <div id="summary" class="metric-grid"></div>
       <div class="panel feature-panel"><div class="panel-head"><h3>Health at a glance</h3><span id="quality-label" class="status-badge"></span></div><div id="dq-metrics" class="metric-grid compact"></div></div>
       <div class="panel"><div class="panel-head"><h3>What needs attention?</h3><span class="table-caption">Detected quality rules</span></div><div class="table-wrap"><table><thead><tr><th>Rule</th><th>Category</th><th>Status</th><th>Finding</th></tr></thead><tbody id="dq-rule-rows"></tbody></table></div></div>
       <div class="step-actions"><button class="primary" data-next="3">View data understanding <span>→</span></button></div>
     </section>
 
-    <section id="step-3" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">03 / DATA UNDERSTANDING</div><h2>Your dataset is understood before it is analysed.</h2><p id="mapping-summary"></p></div><button class="secondary" data-back="2">← Back</button></div>
-      <div class="understanding-banner"><div class="banner-mark">✓</div><div><strong>Data structure interpreted automatically</strong><span>High-confidence fields stay out of your way. Open the details only when you want to inspect evidence or change how a column is understood.</span></div></div>
+    <section id="step-3" class="step-panel" hidden aria-labelledby="step-3-title">
+      <div class="section-head"><div><div class="section-kicker">03 / DATA UNDERSTANDING</div><h2 id="step-3-title">Your dataset is understood before it is analysed.</h2><p id="mapping-summary"></p></div><button class="secondary" data-back="2">← Back</button></div>
+      <div class="understanding-banner"><div class="banner-mark" aria-hidden="true">✓</div><div><strong>Data structure interpreted automatically</strong><span>High-confidence fields stay out of your way. Open the details only when you want to inspect evidence or change how a column is understood.</span></div></div>
       <details class="panel schema-details"><summary><span><strong>Review column understanding</strong><small>Advanced schema controls</small></span><b>Open</b></summary><div class="table-panel"><table><thead><tr><th>Source field</th><th>Type</th><th>Missing</th><th>Interpreted as</th><th>Confidence</th><th>Evidence</th></tr></thead><tbody id="mapping-rows"></tbody></table></div></details>
       <div class="step-actions"><button id="confirm-schema" class="primary">Continue to analysis <span>→</span></button></div>
       <div id="schema-status" class="status" role="status" aria-live="polite"></div>
     </section>
 
-    <section id="step-4" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">04 / EXPLORE</div><h2>What is worth investigating?</h2><p>The planning agent reasons over validated capabilities. Technical feasibility remains deterministic and auditable underneath.</p></div><button class="secondary" data-back="3">← Back</button></div>
+    <section id="step-4" class="step-panel" hidden aria-labelledby="step-4-title">
+      <div class="section-head"><div><div class="section-kicker">04 / EXPLORE</div><h2 id="step-4-title">What is worth investigating?</h2><p>The planning agent reasons over validated capabilities. Technical feasibility remains deterministic and auditable underneath.</p></div><button class="secondary" data-back="3">← Back</button></div>
       <div id="agent-plan" class="agent-plan panel"></div>
       <div class="subsection-head"><div><span class="section-kicker">CAPABILITY MAP</span><h3>Validated analytical capabilities</h3></div><span class="table-caption">Available to the planner and execution layer</span></div>
       <div id="task-grid" class="task-grid"></div>
@@ -68,9 +69,9 @@
       <div class="step-actions"><button class="primary" data-next="5">Open evidence <span>→</span></button></div>
     </section>
 
-    <section id="step-5" class="step-panel" hidden>
-      <div class="section-head"><div><div class="section-kicker">05 / EVIDENCE</div><h2>Follow the evidence, then decide what to do.</h2><p>Every finding is grounded in computed evidence. Recommendations are investigation prompts, not automated employment decisions.</p></div><button class="secondary" data-back="4">← Back</button></div>
-      <div class="evidence-hero"><div><span class="section-kicker">READOUT</span><h3>What stands out?</h3><p>The workspace combines descriptive findings, model evidence, and bounded agentic synthesis into a single analytical readout.</p></div><div class="evidence-hero-mark">01</div></div>
+    <section id="step-5" class="step-panel" hidden aria-labelledby="step-5-title">
+      <div class="section-head"><div><div class="section-kicker">05 / EVIDENCE</div><h2 id="step-5-title">Follow the evidence, then decide what to do.</h2><p>Every finding is grounded in computed evidence. Recommendations are investigation prompts, not automated employment decisions.</p></div><button class="secondary" data-back="4">← Back</button></div>
+      <div class="evidence-hero"><div><span class="section-kicker">READOUT</span><h3>What stands out?</h3><p>The workspace combines descriptive findings, model evidence, and bounded agentic synthesis into a single analytical readout.</p></div><div class="evidence-hero-mark" aria-hidden="true">01</div></div>
       <div id="insight-list" class="insight-list"></div>
       <div class="panel"><div class="panel-head"><h3>Model evaluation</h3><span class="table-caption">Open the hood when you need it</span></div><div id="ml-results"></div></div>
       <div class="panel agent-surface"><div class="panel-head"><div><span class="section-kicker">ANALYTICAL AGENT</span><h3>Evidence synthesis & next actions</h3></div><span class="engine-badge">Bounded evidence</span></div><p class="panel-copy">The agent interprets validated outputs, proposes reversible investigation actions, and records limitations. It does not receive unrestricted HR records.</p><div id="agent-insights"></div></div>
@@ -82,5 +83,6 @@
 <script src="/static/app.js"></script>
 <script src="/static/planner.js"></script>
 <script src="/static/automl.js"></script>
+<script src="/static/ui-enhancements.js" defer></script>
 </body>
 </html>
