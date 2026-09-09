@@ -1,0 +1,128 @@
+name: Ephemeral Spark Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app/services/spark_analytics.py'
+      - 'scripts/external_spark_validation.py'
+      - 'scripts/benchmark.py'
+      - 'tests/test_external_spark_validation.py'
+      - '.github/workflows/ephemeral-spark-validation.yml'
+
+concurrency:
+  group: ephemeral-spark-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: node:20-bookworm
+    services:
+      spark-master:
+        image: apache/spark:3.5.8-python3
+        entrypoint: /bin/bash
+        command: >-
+          -lc '/opt/spark/sbin/start-master.sh && tail -f /dev/null'
+        options: >-
+          --health-cmd "bash -lc '</dev/tcp/127.0.0.1/7077'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      spark-worker:
+        image: apache/spark:3.5.8-python3
+        entrypoint: /bin/bash
+        command: >-
+          -lc '/opt/spark/sbin/start-worker.sh spark://spark-master:7077 && tail -f /dev/null'
+        env:
+          SPARK_WORKER_CORES: '2'
+          SPARK_WORKER_MEMORY: 2g
+        options: >-
+          --health-cmd "bash -lc 'pgrep -f org.apache.spark.deploy.worker.Worker >/dev/null'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Python and Java
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3.11 python3.11-venv openjdk-17-jre-headless
+          python3.11 --version
+          java -version
+
+      - name: Install validation dependencies
+        run: |
+          python3.11 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -e '.[dev,bigdata]'
+
+      - name: Wait for Spark worker registration
+        env:
+          SPARK_MASTER_URL: spark://spark-master:7077
+        run: |
+          for attempt in $(seq 1 30); do
+            if python3.11 - <<'PY'
+          import socket
+          host = 'spark-master'
+          port = 7077
+          with socket.create_connection((host, port), timeout=2):
+              print('Spark master reachable')
+          PY
+            then
+              break
+            fi
+            sleep 2
+          done
+          python3.11 - <<'PY'
+          import socket
+          with socket.create_connection(('spark-master', 7077), timeout=5):
+              print('Spark master TCP endpoint reachable from the job container')
+          PY
+
+      - name: Run external Spark protocol against ephemeral cluster
+        run: |
+          . .venv/bin/activate
+          mkdir -p artifacts
+          HR_ANALYTICS_SPARK_MASTER=spark://spark-master:7077 \
+            python scripts/external_spark_validation.py \
+              --sizes 100 1000 10000 \
+              --seed 42 \
+              --output artifacts/external-spark.json
+
+      - name: Validate evidence artifact
+        run: |
+          . .venv/bin/activate
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path('artifacts/external-spark.json').read_text())
+          assert data['protocol'] == 'external_spark_scalability_v2'
+          assert data['seed'] == 42
+          assert data['sizes'] == [100, 1000, 10000]
+          assert [run['rows'] for run in data['runs']] == data['sizes']
+          for run in data['runs']:
+              validation = run['validation']
+              assert validation['row_count_matches_fixture'] is True
+              assert validation['distributed'] is True
+              assert validation['raw_rows_returned'] is False
+              assert validation['aggregates_match_local_baseline'] is True
+              assert run['elapsed_seconds'] >= 0
+              assert run['rows_per_second'] > 0
+          print('Ephemeral external Spark evidence artifact verified.')
+          PY
+
+      - name: Upload validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ephemeral-spark-validation-${{ github.sha }}
+          path: artifacts/external-spark.json
+          retention-days: 30
