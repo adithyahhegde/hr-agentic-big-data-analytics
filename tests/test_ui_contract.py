@@ -45,6 +45,7 @@ def test_modern_feedback_layer_is_loaded_and_safe():
 
 
 def test_raw_employee_records_are_not_introduced_by_ui_layer():
-    assert 'employee identities and individual anomaly records are not exposed' in INDEX
-    assert 'does not receive unrestricted HR records' in INDEX
-    assert 'local-first' in INDEX
+    index_lower = INDEX.lower()
+    assert 'employee identities and individual anomaly records are not exposed' in index_lower
+    assert 'does not receive unrestricted hr records' in index_lower
+    assert 'local-first' in index_lower
