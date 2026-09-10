@@ -62,10 +62,18 @@ jobs:
           assert [m['rows'] for m in data['runs']] == data['sizes']
           for measurement in data['runs']:
               validation = measurement['validation']
+              execution = measurement['result']['execution']
               assert validation['row_count_matches_fixture'] is True
               assert validation['distributed'] is True
               assert validation['raw_rows_returned'] is False
               assert validation['aggregates_match_local_baseline'] is True
+              assert validation['spark_version_present'] is True
+              assert validation['parallelism_positive'] is True
+              assert validation['application_id_present'] is True
+              assert execution['spark_version']
+              assert execution['default_parallelism'] > 0
+              assert execution['application_id']
+              assert execution['input_mode'] == 'driver_parallelized_csv'
               assert measurement['elapsed_seconds'] >= 0
               assert measurement['rows_per_second'] > 0
           print('External Spark evidence artifact verified.')
