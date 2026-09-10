@@ -5,16 +5,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = (ROOT / ".github" / "workflows" / "ephemeral-spark-validation.yml").read_text(encoding="utf-8")
+PYPROJECT = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
 
-def test_ephemeral_spark_workflow_uses_supported_runtime_provisioning():
+def test_ephemeral_spark_workflow_uses_worker_compatible_runtime_provisioning():
     assert "actions/setup-python@v5" in WORKFLOW
-    assert "python-version: '3.11'" in WORKFLOW
+    assert "python-version: '3.10'" in WORKFLOW
     assert "actions/setup-java@v5" in WORKFLOW
     assert "java-version: '17'" in WORKFLOW
     assert "apt-get install" not in WORKFLOW
     assert "python3.11" not in WORKFLOW
     assert "cache: maven" not in WORKFLOW
+    assert 'requires-python = ">=3.10"' in PYPROJECT
 
 
 def test_ephemeral_spark_workflow_uses_explicit_pinned_spark_processes():
