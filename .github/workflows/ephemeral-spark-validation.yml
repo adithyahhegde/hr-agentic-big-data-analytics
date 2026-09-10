@@ -12,6 +12,7 @@ on:
       - 'tests/test_spark_mapping_contract.py'
       - 'tests/test_ephemeral_spark_workflow.py'
       - '.github/workflows/ephemeral-spark-validation.yml'
+      - 'pyproject.toml'
 
 concurrency:
   group: ephemeral-spark-validation-${{ github.ref }}
@@ -29,7 +30,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
       - name: Set up Java
         uses: actions/setup-java@v5
