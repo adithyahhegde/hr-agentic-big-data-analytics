@@ -2,6 +2,12 @@ name: External Spark Validation
 
 on:
   workflow_dispatch:
+    inputs:
+      spark_version:
+        description: 'Spark/PySpark version installed on the target cluster'
+        required: true
+        default: '3.5.8'
+        type: string
 
 concurrency:
   group: external-spark-validation
@@ -15,6 +21,7 @@ jobs:
       HR_ANALYTICS_SPARK_MASTER: ${{ secrets.HR_ANALYTICS_SPARK_MASTER }}
       HR_ANALYTICS_SPARK_DRIVER_HOST: ${{ secrets.HR_ANALYTICS_SPARK_DRIVER_HOST }}
       HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS: ${{ secrets.HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS }}
+      SPARK_VALIDATION_VERSION: ${{ inputs.spark_version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -25,6 +32,7 @@ jobs:
       - name: Require a non-local target cluster
         run: |
           test -n "$HR_ANALYTICS_SPARK_MASTER" || { echo 'HR_ANALYTICS_SPARK_MASTER is required for this manual validation gate.'; exit 1; }
+          test -n "$SPARK_VALIDATION_VERSION" || { echo 'spark_version workflow input is required.'; exit 1; }
           case "$HR_ANALYTICS_SPARK_MASTER" in
             spark://localhost:*|spark://127.0.0.1:*|spark://\[::1\]:*) echo 'Local/loopback Spark masters are not accepted.'; exit 1;;
           esac
@@ -52,15 +60,30 @@ jobs:
               print(f"Configured Spark driver host: {driver_host}")
           if driver_bind:
               print(f"Configured Spark driver bind address: {driver_bind}")
+          print(f"Expected Spark/PySpark version: {os.environ['SPARK_VALIDATION_VERSION']}")
           PY
       - name: Install validation dependencies
-        run: python -m pip install --upgrade pip && pip install -e '.[dev,bigdata]'
+        run: python -m pip install --upgrade pip && pip install -e '.[dev,bigdata]' "pyspark==${SPARK_VALIDATION_VERSION}"
+      - name: Verify PySpark driver version
+        run: |
+          python - <<'PY'
+          import os
+          import pyspark
+
+          expected = os.environ["SPARK_VALIDATION_VERSION"]
+          if pyspark.__version__ != expected:
+              raise SystemExit(
+                  f"PySpark driver/cluster version contract failed: driver={pyspark.__version__}, expected={expected}"
+              )
+          print(f"PySpark driver version matches target contract: {expected}")
+          PY
       - name: Run external Spark protocol
         run: python scripts/external_spark_validation.py --sizes 100 1000 10000 --seed 42 --output artifacts/external-spark.json
       - name: Validate evidence artifact
         run: |
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
           p = Path('artifacts/external-spark.json')
           data = json.loads(p.read_text())
@@ -68,6 +91,7 @@ jobs:
           assert data['seed'] == 42
           assert data['sizes'] == [100, 1000, 10000]
           assert [m['rows'] for m in data['runs']] == data['sizes']
+          expected_version = os.environ['SPARK_VALIDATION_VERSION']
           for measurement in data['runs']:
               validation = measurement['validation']
               execution = measurement['result']['execution']
@@ -78,7 +102,7 @@ jobs:
               assert validation['spark_version_present'] is True
               assert validation['parallelism_positive'] is True
               assert validation['application_id_present'] is True
-              assert execution['spark_version']
+              assert execution['spark_version'] == expected_version
               assert execution['default_parallelism'] > 0
               assert execution['application_id']
               assert execution['input_mode'] == 'driver_parallelized_csv'
