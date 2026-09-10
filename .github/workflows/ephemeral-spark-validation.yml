@@ -18,6 +18,9 @@ concurrency:
   group: ephemeral-spark-validation-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  SPARK_VALIDATION_VERSION: '3.5.8'
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -41,15 +44,15 @@ jobs:
       - name: Start ephemeral Spark cluster
         run: |
           set -euxo pipefail
-          docker pull apache/spark:3.5.8-python3
+          docker pull "apache/spark:${SPARK_VALIDATION_VERSION}-python3"
           docker network create hr-spark-ci
           docker run -d --name spark-master --network hr-spark-ci -p 7077:7077 -p 8080:8080 \
-            apache/spark:3.5.8-python3 \
+            "apache/spark:${SPARK_VALIDATION_VERSION}-python3" \
             /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master \
             --host 0.0.0.0 --port 7077 --webui-port 8080
           docker run -d --name spark-worker --network hr-spark-ci \
             --add-host host.docker.internal:host-gateway \
-            apache/spark:3.5.8-python3 \
+            "apache/spark:${SPARK_VALIDATION_VERSION}-python3" \
             /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker \
             spark://spark-master:7077 --cores 2 --memory 2g
           docker ps --format 'table {{.Names}}\t{{.Status}}'
@@ -59,7 +62,18 @@ jobs:
           python -m venv .venv
           . .venv/bin/activate
           python -m pip install --upgrade pip
-          pip install -e '.[dev,bigdata]'
+          pip install -e '.[dev,bigdata]' "pyspark==${SPARK_VALIDATION_VERSION}"
+          python - <<'PY'
+          import os
+          import pyspark
+
+          expected = os.environ['SPARK_VALIDATION_VERSION']
+          assert pyspark.__version__ == expected, (
+              f'PySpark driver {pyspark.__version__} does not match '
+              f'ephemeral Spark {expected}'
+          )
+          print(f'PySpark driver/cluster version contract: {expected}')
+          PY
 
       - name: Wait for Spark master and worker
         run: |
