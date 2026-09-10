@@ -11,9 +11,12 @@ EXTERNAL_WORKFLOW = (ROOT / ".github" / "workflows" / "external-spark-validation
 PYPROJECT = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
 
+PYTHON_RUNTIME = "3.10"
+
+
 def test_ephemeral_spark_workflow_uses_worker_compatible_runtime_provisioning():
-    assert "actions/setup-python@v5" in WORKFLOW
-    assert "python-version: '3.10'" in WORKFLOW
+    assert "actions/setup-python@v6" in WORKFLOW
+    assert f"python-version: '{PYTHON_RUNTIME}'" in WORKFLOW
     assert "actions/setup-java@v5" in WORKFLOW
     assert "java-version: '17'" in WORKFLOW
     assert "apt-get install" not in WORKFLOW
@@ -25,8 +28,18 @@ def test_ephemeral_spark_workflow_uses_worker_compatible_runtime_provisioning():
 def test_all_python_workflows_match_supported_project_runtime():
     workflows = (CI_WORKFLOW, EVALUATION_WORKFLOW, EXTERNAL_WORKFLOW, WORKFLOW)
     for workflow in workflows:
-        assert "python-version: '3.10'" in workflow
+        assert "actions/setup-python@v6" in workflow
+        assert f"python-version: '{PYTHON_RUNTIME}'" in workflow
         assert "python-version: '3.11'" not in workflow
+
+
+def test_workflows_use_current_node24_compatible_actions():
+    workflows = (CI_WORKFLOW, EVALUATION_WORKFLOW, EXTERNAL_WORKFLOW, WORKFLOW)
+    for workflow in workflows:
+        assert "actions/checkout@v6" in workflow
+        assert "actions/checkout@v4" not in workflow
+        assert "actions/setup-python@v6" in workflow
+        assert "actions/setup-python@v5" not in workflow
 
 
 def test_evaluation_workflow_runs_when_project_metadata_changes():
