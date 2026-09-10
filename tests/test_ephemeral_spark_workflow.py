@@ -87,6 +87,17 @@ def test_ephemeral_spark_workflow_configures_routable_driver_and_evidence_contra
     assert "rows_per_second" in WORKFLOW
 
 
+def test_ephemeral_spark_workflow_requires_provenance_and_version_alignment():
+    assert "data['source_revision'] == os.environ['GITHUB_SHA']" in WORKFLOW
+    assert "data['source_revision'] != 'unknown'" in WORKFLOW
+    assert "runtime']['python_version']" in WORKFLOW
+    assert "runtime']['platform']" in WORKFLOW
+    assert "len(run['fixture_sha256']) == 64" in WORKFLOW
+    assert "run['fixture_schema']" in WORKFLOW
+    assert "execution['spark_version'] == expected_version" in WORKFLOW
+    assert "execution['input_mode'] == 'driver_parallelized_csv'" in WORKFLOW
+
+
 def test_manual_external_workflow_keeps_target_cluster_gate():
     assert "HR_ANALYTICS_SPARK_MASTER: ${{ secrets.HR_ANALYTICS_SPARK_MASTER }}" in EXTERNAL_WORKFLOW
     assert "Require a non-local target cluster" in EXTERNAL_WORKFLOW
