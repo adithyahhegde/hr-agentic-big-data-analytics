@@ -136,6 +136,7 @@ jobs:
           . .venv/bin/activate
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           data = json.loads(Path('artifacts/external-spark.json').read_text())
@@ -143,15 +144,30 @@ jobs:
           assert data['seed'] == 42
           assert data['sizes'] == [100, 1000, 10000]
           assert [run['rows'] for run in data['runs']] == data['sizes']
+          assert data['source_revision'] == os.environ['GITHUB_SHA']
+          assert data['source_revision'] != 'unknown'
+          assert isinstance(data['runtime']['python_version'], str) and data['runtime']['python_version']
+          assert isinstance(data['runtime']['platform'], str) and data['runtime']['platform']
+          expected_version = os.environ['SPARK_VALIDATION_VERSION']
           for run in data['runs']:
               validation = run['validation']
+              execution = run['result']['execution']
+              assert len(run['fixture_sha256']) == 64
+              assert run['fixture_schema']
               assert validation['row_count_matches_fixture'] is True
               assert validation['distributed'] is True
               assert validation['raw_rows_returned'] is False
               assert validation['aggregates_match_local_baseline'] is True
+              assert validation['spark_version_present'] is True
+              assert validation['parallelism_positive'] is True
+              assert validation['application_id_present'] is True
+              assert execution['spark_version'] == expected_version
+              assert execution['default_parallelism'] > 0
+              assert execution['application_id']
+              assert execution['input_mode'] == 'driver_parallelized_csv'
               assert run['elapsed_seconds'] >= 0
               assert run['rows_per_second'] > 0
-          print('Ephemeral external Spark evidence artifact verified.')
+          print('Ephemeral Spark evidence artifact verified.')
           PY
 
       - name: Upload validation artifact
