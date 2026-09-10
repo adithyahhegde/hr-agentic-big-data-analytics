@@ -24,6 +24,6 @@ def test_local_analytics_emits_one_categorical_summary_per_mapped_field(tmp_path
     )
 
     summaries = result["categorical_summary"]
-    assert [item["field"] for item in summaries] == ["attrition", "department"]
+    assert [item["field"] for item in summaries] == ["attrition", "department", "employee_id"]
     assert sum(item["field"] == "attrition" for item in summaries) == 1
     assert next(item for item in summaries if item["field"] == "attrition")["count"] == 3
