@@ -109,6 +109,34 @@ def _aggregate_values_match(actual: Any, expected: Any) -> bool:
     return actual == expected
 
 
+def _first_aggregate_difference(actual: Any, expected: Any, path: str = "root") -> str | None:
+    """Return one deterministic path/value mismatch for actionable CI diagnostics."""
+    if isinstance(actual, dict) and isinstance(expected, dict):
+        if actual.keys() != expected.keys():
+            return f"{path}: keys differ (actual={sorted(actual)}, expected={sorted(expected)})"
+        for key in expected:
+            difference = _first_aggregate_difference(actual[key], expected[key], f"{path}.{key}")
+            if difference:
+                return difference
+        return None
+    if isinstance(actual, list) and isinstance(expected, list):
+        if len(actual) != len(expected):
+            return f"{path}: list lengths differ (actual={len(actual)}, expected={len(expected)})"
+        for index, (actual_item, expected_item) in enumerate(zip(actual, expected)):
+            difference = _first_aggregate_difference(actual_item, expected_item, f"{path}[{index}]")
+            if difference:
+                return difference
+        return None
+    if isinstance(actual, float) or isinstance(expected, float):
+        if actual is None or expected is None:
+            return None if actual is expected else f"{path}: actual={actual!r}, expected={expected!r}"
+        if math.isclose(float(actual), float(expected), rel_tol=NUMERIC_REL_TOLERANCE, abs_tol=NUMERIC_ABS_TOLERANCE):
+            return None
+    elif actual == expected:
+        return None
+    return f"{path}: actual={actual!r}, expected={expected!r}"
+
+
 def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dict[str, Any] | None = None) -> dict[str, Any]:
     execution = result.get("execution", {})
     validation: dict[str, Any] = {
@@ -133,7 +161,8 @@ def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dic
         actual = _aggregate_signature(result)
         validation["aggregates_match_local_baseline"] = _aggregate_values_match(actual, expected_aggregates)
         if not validation["aggregates_match_local_baseline"]:
-            raise RuntimeError("external Spark aggregates differ from the deterministic local baseline")
+            difference = _first_aggregate_difference(actual, expected_aggregates) or "unknown aggregate difference"
+            raise RuntimeError(f"external Spark aggregates differ from the deterministic local baseline: {difference}")
     return validation
 
 
