@@ -137,7 +137,7 @@ def _first_aggregate_difference(actual: Any, expected: Any, path: str = "root") 
     return f"{path}: actual={actual!r}, expected={expected!r}"
 
 
-def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dict[str, Any] | None = None) -> dict[str, Any]:
+def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dict[str, Any] | None = None, expected_spark_version: str | None = None) -> dict[str, Any]:
     execution = result.get("execution", {})
     validation: dict[str, Any] = {
         "row_count_matches_fixture": result.get("row_count") == rows,
@@ -153,6 +153,13 @@ def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dic
         raise RuntimeError("configured non-local Spark master did not report distributed execution")
     if validation["raw_rows_returned"] is not False:
         raise RuntimeError("external Spark validation must not return raw rows")
+    if not validation["spark_version_present"]:
+        raise RuntimeError("external Spark validation did not report the target Spark version")
+    if expected_spark_version and execution.get("spark_version") != expected_spark_version:
+        raise RuntimeError(
+            "external Spark version contract failed: "
+            f"target={execution.get('spark_version')!r}, expected={expected_spark_version!r}"
+        )
     if expected_aggregates is not None:
         aggregate_fields = {"duplicate_row_count", "numeric_summary", "categorical_summary", "missing_by_field"}
         if not aggregate_fields.issubset(result):
@@ -174,6 +181,7 @@ def validate(*, rows: int = 10_000, seed: int = 42, master: str | None = None) -
 def validate_sizes(*, sizes: Sequence[int] = DEFAULT_SIZES, seed: int = 42, master: str | None = None, protocol: str = PROTOCOL_VERSION) -> dict[str, Any]:
     normalized_sizes = _validate_sizes(sizes)
     configured_master = _validate_external_master(master)
+    expected_spark_version = os.getenv("SPARK_VALIDATION_VERSION", "").strip() or None
     started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     source_revision = os.getenv("GITHUB_SHA") or os.getenv("HR_ANALYTICS_SOURCE_REVISION") or "unknown"
     runtime = {
@@ -193,7 +201,7 @@ def validate_sizes(*, sizes: Sequence[int] = DEFAULT_SIZES, seed: int = 42, mast
             lines = fixture_bytes.decode("utf-8").splitlines()
             result = analyze_spark_csv_lines(lines, MAPPINGS, master=configured_master, stop_session=True)
             elapsed = time.perf_counter() - started
-            validation = _validate_result(result, rows, expected_aggregates)
+            validation = _validate_result(result, rows, expected_aggregates, expected_spark_version)
             runs.append({
                 "rows": rows,
                 "fixture_sha256": fixture_sha256,
