@@ -93,3 +93,10 @@ def test_manual_external_workflow_keeps_target_cluster_gate():
     assert "socket.create_connection" in EXTERNAL_WORKFLOW
     assert "external_spark_scalability_v2" in EXTERNAL_WORKFLOW
     assert "aggregates_match_local_baseline" in EXTERNAL_WORKFLOW
+
+
+def test_manual_external_workflow_supports_routable_driver_configuration():
+    assert "HR_ANALYTICS_SPARK_DRIVER_HOST: ${{ secrets.HR_ANALYTICS_SPARK_DRIVER_HOST }}" in EXTERNAL_WORKFLOW
+    assert "HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS: ${{ secrets.HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS }}" in EXTERNAL_WORKFLOW
+    assert 'os.environ.get("HR_ANALYTICS_SPARK_DRIVER_HOST", "").strip()' in EXTERNAL_WORKFLOW
+    assert 'os.environ.get("HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS", "").strip()' in EXTERNAL_WORKFLOW
