@@ -240,6 +240,22 @@ def test_external_validation_rejects_aggregate_mismatch(monkeypatch):
         validate(rows=10, seed=42, master="spark://example:7077")
 
 
+def test_external_validation_normalizes_explicit_zero_missing_fields():
+    result = external_validation._aggregate_signature(
+        {
+            "row_count": 1,
+            "duplicate_row_count": 0,
+            "numeric_summary": [],
+            "categorical_summary": [],
+            "missing_by_field": [
+                {"field": "age", "missing": 0, "rate": 0.0},
+                {"field": "salary", "missing": 1, "rate": 1.0},
+            ],
+        }
+    )
+    assert result["missing_by_field"] == [{"field": "salary", "missing": 1, "rate": 1.0}]
+
+
 def test_external_validation_accepts_matching_aggregate_baseline():
     result = external_validation._validate_result(
         {
