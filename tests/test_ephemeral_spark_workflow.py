@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = (ROOT / ".github" / "workflows" / "ephemeral-spark-validation.yml").read_text(encoding="utf-8")
+CI_WORKFLOW = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 EVALUATION_WORKFLOW = (ROOT / ".github" / "workflows" / "evaluation.yml").read_text(encoding="utf-8")
 EXTERNAL_WORKFLOW = (ROOT / ".github" / "workflows" / "external-spark-validation.yml").read_text(encoding="utf-8")
 PYPROJECT = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
@@ -21,11 +22,11 @@ def test_ephemeral_spark_workflow_uses_worker_compatible_runtime_provisioning():
     assert 'requires-python = ">=3.10"' in PYPROJECT
 
 
-def test_all_spark_evaluation_workflows_match_supported_python_runtime():
-    assert "python-version: '3.10'" in EVALUATION_WORKFLOW
-    assert "python-version: '3.10'" in EXTERNAL_WORKFLOW
-    assert "python-version: '3.11'" not in EVALUATION_WORKFLOW
-    assert "python-version: '3.11'" not in EXTERNAL_WORKFLOW
+def test_all_python_workflows_match_supported_project_runtime():
+    workflows = (CI_WORKFLOW, EVALUATION_WORKFLOW, EXTERNAL_WORKFLOW, WORKFLOW)
+    for workflow in workflows:
+        assert "python-version: '3.10'" in workflow
+        assert "python-version: '3.11'" not in workflow
 
 
 def test_evaluation_workflow_runs_when_project_metadata_changes():
