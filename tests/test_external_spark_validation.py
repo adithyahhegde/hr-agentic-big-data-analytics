@@ -341,3 +341,12 @@ def test_external_workflow_requires_bounded_spark_provenance():
     assert "parallelism_positive" in EXTERNAL_WORKFLOW
     assert "application_id_present" in EXTERNAL_WORKFLOW
     assert "input_mode'] == 'driver_parallelized_csv'" in EXTERNAL_WORKFLOW
+
+
+def test_external_workflow_requires_evidence_provenance():
+    assert "source_revision" in EXTERNAL_WORKFLOW
+    assert "GITHUB_SHA" in EXTERNAL_WORKFLOW
+    assert "data['source_revision'] != 'unknown'" in EXTERNAL_WORKFLOW
+    assert "runtime']['python_version']" in EXTERNAL_WORKFLOW
+    assert "runtime']['platform']" in EXTERNAL_WORKFLOW
+    assert "len(measurement['fixture_sha256']) == 64" in EXTERNAL_WORKFLOW
