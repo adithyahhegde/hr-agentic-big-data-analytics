@@ -28,9 +28,6 @@ def _same_dataset(analytics: dict[str, Any], result: dict[str, Any]) -> bool:
     provenance = result.get("provenance")
     provenance_fingerprint = provenance.get("dataset_fingerprint") if isinstance(provenance, dict) else None
 
-    # A result may carry its lineage in either location, but if both are
-    # present they must agree. Never accept contradictory provenance merely
-    # because one copy happens to match the current dataset.
     fingerprints = [value for value in (result_fingerprint, provenance_fingerprint) if value]
     if not fingerprints:
         return False
@@ -116,4 +113,18 @@ def synthesize(analytics: dict[str, Any], ml_runs: list[dict[str, Any]]) -> dict
     ]
     if rejected_runs:
         limitations.append(f"{rejected_runs} analytical run(s) were excluded because their objective, provenance, or values could not be safely verified for the current dataset.")
-    return {"agent": "bounded_evidence_synthesizer_v4", "plan": ["collect verified findings", "validate supported objectives and dataset provenance", "classify evidence by analytical source", "rank material signals", "draft reversible investigation actions", "attach evidence-object citations and limitations"], "evidence": evidence, "recommendations": actions, "limitations": limitations, "raw_hr_records_accessed": False}
+    return {
+        "agent": "bounded_evidence_synthesizer_v4",
+        "plan": ["collect verified findings", "validate supported objectives and dataset provenance", "classify evidence by analytical source", "rank material signals", "draft reversible investigation actions", "attach evidence-object citations and limitations"],
+        "evidence": evidence,
+        "recommendations": actions,
+        "limitations": limitations,
+        "raw_hr_records_accessed": False,
+        "provenance": {
+            "dataset_fingerprint": analytics.get("dataset_fingerprint"),
+            "evidence_count": len(evidence),
+            "accepted_ml_runs": len([item for item in ml_runs if item.get("objective") in _SUPPORTED_OBJECTIVES and _same_dataset(analytics, item)]),
+            "rejected_ml_runs": rejected_runs,
+            "source_scope": "structured_analytics_only",
+        },
+    }

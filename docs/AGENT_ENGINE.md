@@ -39,7 +39,7 @@ The synthesis service produces reversible investigation actions rather than empl
 
 ## Provenance
 
-Run records retain dataset ID and fingerprint, operation, execution engine, status, timestamp, and a structured provenance object. Analytical results also carry schema version where applicable. Dataset manifests persist the source metadata, profile, and confirmed mappings. Report generation exposes privacy guarantees that raw source records and employee-level identifiers are not included in the exported report payload.
+Run records retain dataset ID and fingerprint, operation, execution engine, status, timestamp, and a structured provenance object. Analytical results also carry schema version where applicable. Dataset manifests persist the source metadata, profile, and confirmed mappings. The synthesis result also exposes aggregate provenance containing the current dataset fingerprint, evidence count, accepted/rejected ML-run accounting, and an explicit `structured_analytics_only` source scope. This metadata contains no raw HR records and makes the lineage of a generated report inspectable without exposing employee rows.
 
 ## Failure and recovery policy
 
@@ -51,4 +51,4 @@ Raw HR records are used by deterministic analytical services only as necessary t
 
 ## Current implementation boundary
 
-The implemented agentic layer now includes **bounded analytical planning plus bounded evidence synthesis**. Remaining research/product layers include multi-step execution state, richer retry orchestration, human approval workflows for consequential actions, evidence-object-level recommendation citations, and systematic planner-quality evaluation against human analyst baselines.
+The implemented agentic layer now includes **bounded analytical planning plus bounded evidence synthesis**. The evidence synthesizer rejects unsupported objectives and unprovenanced/cross-dataset ML results, caps evidence volume/text, emits evidence-object citations for recommendations, and exposes aggregate provenance. Remaining research/product layers include systematic planner-quality evaluation against human analyst baselines and independent external-cluster scalability measurement.

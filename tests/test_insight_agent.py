@@ -97,3 +97,16 @@ def test_synthesis_rejects_conflicting_top_level_and_nested_provenance():
     )
     assert result["evidence"] == []
     assert "1 analytical run(s) were excluded" in result["limitations"][-1]
+
+
+def test_synthesis_exposes_aggregate_provenance_without_raw_records():
+    result = synthesize(
+        {"dataset_fingerprint": "current", "insights": []},
+        [{"objective": "attrition_classification", "selected_model": "model-a", "dataset_fingerprint": "current"}],
+    )
+    provenance = result["provenance"]
+    assert provenance["dataset_fingerprint"] == "current"
+    assert provenance["evidence_count"] == 1
+    assert provenance["rejected_ml_runs"] == 0
+    assert provenance["source_scope"] == "structured_analytics_only"
+    assert "raw_hr_records" not in provenance
