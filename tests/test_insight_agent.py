@@ -64,3 +64,22 @@ def test_synthesis_bounds_and_truncates_descriptive_evidence():
     assert len(result["evidence"]) == 50
     assert len(result["evidence"][0]["evidence"]) == 500
     assert result["evidence"][-1]["evidence_id"] == "evidence-50"
+
+
+def test_synthesis_rejects_missing_run_provenance_when_dataset_is_bound():
+    result = synthesize(
+        {"dataset_fingerprint": "current", "insights": []},
+        [{"objective": "attrition_classification", "selected_model": "model-a"}],
+    )
+    assert result["evidence"] == []
+    assert result["recommendations"][0]["evidence_ids"] == []
+    assert "1 analytical run(s) were excluded" in result["limitations"][-1]
+
+
+def test_synthesis_accepts_nested_dataset_provenance():
+    result = synthesize(
+        {"dataset_fingerprint": "current", "insights": []},
+        [{"objective": "attrition_classification", "selected_model": "model-a", "provenance": {"dataset_fingerprint": "current"}}],
+    )
+    assert len(result["evidence"]) == 1
+    assert result["evidence"][0]["type"] == "PREDICTIVE"

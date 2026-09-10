@@ -22,11 +22,13 @@ def _text(value: Any, default: str) -> str:
 def _same_dataset(analytics: dict[str, Any], result: dict[str, Any]) -> bool:
     analytics_fingerprint = analytics.get("dataset_fingerprint")
     result_fingerprint = result.get("dataset_fingerprint")
-    if analytics_fingerprint and result_fingerprint:
-        return analytics_fingerprint == result_fingerprint
-    provenance = result.get("provenance")
-    if isinstance(provenance, dict) and analytics_fingerprint:
-        return provenance.get("dataset_fingerprint") == analytics_fingerprint
+    if analytics_fingerprint:
+        if result_fingerprint:
+            return result_fingerprint == analytics_fingerprint
+        provenance = result.get("provenance")
+        if isinstance(provenance, dict):
+            return provenance.get("dataset_fingerprint") == analytics_fingerprint
+        return False
     return True
 
 
