@@ -111,3 +111,12 @@ def test_spark_session_applies_remote_driver_network_configuration(monkeypatch):
     assert ("master", "spark://127.0.0.1:7077") in builder.calls
     assert ("config", "spark.driver.host", "host.docker.internal") in builder.calls
     assert ("config", "spark.driver.bindAddress", "0.0.0.0") in builder.calls
+
+
+def test_spark_source_contains_categorical_normalization_before_grouping():
+    from pathlib import Path
+
+    source = (Path(__file__).parents[1] / "app" / "services" / "spark_analytics.py").read_text(encoding="utf-8")
+    assert 'cleaned = F.trim(F.col(canonical).cast("string"))' in source
+    assert 'non_missing_df.select(cleaned.alias("value"))' in source
+    assert 'distinct = non_missing_df.select(cleaned.alias("value")).distinct().count()' in source
