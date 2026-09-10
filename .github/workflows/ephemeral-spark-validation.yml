@@ -5,12 +5,14 @@ on:
   push:
     branches: [main]
     paths:
+      - 'app/services/analytics.py'
       - 'app/services/spark_analytics.py'
       - 'scripts/external_spark_validation.py'
       - 'scripts/benchmark.py'
       - 'tests/test_external_spark_validation.py'
       - 'tests/test_spark_mapping_contract.py'
       - 'tests/test_ephemeral_spark_workflow.py'
+      - 'tests/test_analytics_categorical_order.py'
       - '.github/workflows/ephemeral-spark-validation.yml'
       - 'pyproject.toml'
 
