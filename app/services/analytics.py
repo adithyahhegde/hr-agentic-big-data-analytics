@@ -84,6 +84,5 @@ def analyze_csv(path: Path, mappings: dict[str, str], max_categories: int = 5) -
             positive = sum(v for k, v in counts.items() if k in {"yes", "y", "true", "1", "left", "terminated", "attrition"})
             if positive:
                 insights.append({"type": "WORKFORCE", "severity": "INFO", "title": "Attrition signal available", "evidence": f"{positive:,} of {total:,} non-empty attrition labels are in the positive class ({positive / total:.1%})."})
-            categorical_summary.append({"field": "attrition", "count": total, "distinct": len(counts), "top_values": [{"value": k, "count": v, "share": round(v / total, 4)} for k, v in counts.most_common(max_categories)]})
 
     return {"row_count": row_count, "duplicate_row_count": duplicate_rows, "numeric_summary": numeric_summary, "categorical_summary": categorical_summary, "missing_by_field": [{"field": field, "missing": count, "rate": round(count / row_count, 4) if row_count else 0} for field, count in sorted(missing.items())], "insights": insights}
