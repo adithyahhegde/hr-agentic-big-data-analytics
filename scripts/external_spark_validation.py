@@ -118,6 +118,9 @@ def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dic
         "row_count_matches_fixture": result.get("row_count") == rows,
         "raw_rows_returned": execution.get("raw_rows_returned"),
         "distributed": execution.get("distributed"),
+        "spark_version_present": bool(execution.get("spark_version")),
+        "parallelism_positive": isinstance(execution.get("default_parallelism"), int) and execution.get("default_parallelism", 0) > 0,
+        "application_id_present": bool(execution.get("application_id")),
     }
     if not validation["row_count_matches_fixture"]:
         raise RuntimeError("external Spark validation returned an unexpected row count")
@@ -125,6 +128,12 @@ def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dic
         raise RuntimeError("configured non-local Spark master did not report distributed execution")
     if validation["raw_rows_returned"] is not False:
         raise RuntimeError("external Spark validation must not return raw rows")
+    if not validation["spark_version_present"]:
+        raise RuntimeError("external Spark validation did not report a Spark version")
+    if not validation["parallelism_positive"]:
+        raise RuntimeError("external Spark validation did not report positive executor parallelism")
+    if not validation["application_id_present"]:
+        raise RuntimeError("external Spark validation did not report a Spark application id")
     if expected_aggregates is not None:
         aggregate_fields = {"duplicate_row_count", "numeric_summary", "categorical_summary", "missing_by_field"}
         if not aggregate_fields.issubset(result):
