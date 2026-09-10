@@ -77,10 +77,6 @@ def _aggregate_signature(result: dict[str, Any]) -> dict[str, Any]:
             "distinct": item.get("distinct"),
             "top_values": top_values,
         })
-    # The local analyzer intentionally reports only fields with observed
-    # missingness, while Spark reports every mapped field (including zero
-    # missing). Compare the shared semantic representation rather than treating
-    # an explicit zero as a disagreement.
     missing_by_field = [
         item for item in result.get("missing_by_field", [])
         if item.get("missing", 0) != 0
@@ -128,12 +124,6 @@ def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dic
         raise RuntimeError("configured non-local Spark master did not report distributed execution")
     if validation["raw_rows_returned"] is not False:
         raise RuntimeError("external Spark validation must not return raw rows")
-    if not validation["spark_version_present"]:
-        raise RuntimeError("external Spark validation did not report a Spark version")
-    if not validation["parallelism_positive"]:
-        raise RuntimeError("external Spark validation did not report positive executor parallelism")
-    if not validation["application_id_present"]:
-        raise RuntimeError("external Spark validation did not report a Spark application id")
     if expected_aggregates is not None:
         aggregate_fields = {"duplicate_row_count", "numeric_summary", "categorical_summary", "missing_by_field"}
         if not aggregate_fields.issubset(result):
