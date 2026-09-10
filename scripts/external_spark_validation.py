@@ -54,12 +54,16 @@ def _validate_external_master(master: str | None) -> str:
 
 
 def _validate_sizes(sizes: Sequence[int]) -> list[int]:
-    normalized = sorted(set(sizes))
-    if not normalized or any(not isinstance(size, int) or isinstance(size, bool) or size < 1 for size in normalized):
+    sizes_list = list(sizes)
+    if not sizes_list or any(
+        not isinstance(size, int) or isinstance(size, bool) or size < 1 for size in sizes_list
+    ):
         raise ValueError("sizes must contain positive integers")
-    if any(size > MAX_VALIDATION_ROWS for size in normalized):
+    if len(set(sizes_list)) != len(sizes_list):
+        raise ValueError("sizes must be unique so the scalability evidence matches the requested protocol")
+    if any(size > MAX_VALIDATION_ROWS for size in sizes_list):
         raise ValueError(f"sizes must not exceed {MAX_VALIDATION_ROWS:,} rows")
-    return normalized
+    return sorted(sizes_list)
 
 
 def _aggregate_signature(result: dict[str, Any]) -> dict[str, Any]:
