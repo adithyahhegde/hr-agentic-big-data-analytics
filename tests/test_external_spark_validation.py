@@ -106,6 +106,11 @@ def test_external_validation_rejects_non_integer_sizes(sizes):
         validate_sizes(sizes=sizes, master="spark://example:7077")
 
 
+def test_external_validation_rejects_duplicate_sizes():
+    with pytest.raises(ValueError, match="sizes must be unique"):
+        validate_sizes(sizes=[100, 100], master="spark://example:7077")
+
+
 def test_external_validation_rejects_unbounded_sizes():
     with pytest.raises(ValueError, match="100,000"):
         validate_sizes(sizes=[100_001], master="spark://example:7077")
@@ -122,7 +127,7 @@ def test_external_validation_public_validate_rejects_non_integer_rows():
         validate(rows=True, master="spark://example:7077")
 
 
-def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
+def test_external_validation_normalizes_unique_sizes_and_records_timings(monkeypatch):
     _stub_local_baseline(monkeypatch)
     calls = []
 
@@ -132,16 +137,17 @@ def test_external_validation_normalizes_sizes_and_records_timings(monkeypatch):
         return {**_aggregate_contract(rows), "execution": _execution_contract()}
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
-    result = validate_sizes(sizes=[1000, 100, 1000], seed=42, master="spark://example:7077")
+    result = validate_sizes(sizes=[1000, 100, 10_000], seed=42, master="spark://example:7077")
     assert result["protocol"] == "external_spark_scalability_v2"
-    assert result["sizes"] == [100, 1000]
-    assert [run["rows"] for run in result["runs"]] == [100, 1000]
+    assert result["sizes"] == [100, 1000, 10_000]
+    assert [run["rows"] for run in result["runs"]] == [100, 1000, 10_000]
     assert all(run["elapsed_seconds"] >= 0 for run in result["runs"])
     assert all(run["rows_per_second"] is not None and run["rows_per_second"] > 0 for run in result["runs"])
     assert all(len(run["fixture_sha256"]) == 64 for run in result["runs"])
     assert result["started_at"].endswith("Z")
     assert calls[0][0] == 100
     assert calls[1][0] == 1000
+    assert calls[2][0] == 10_000
     assert all(call[1] == "spark://example:7077" for call in calls)
     assert all(call[2] is True for call in calls)
     assert all(call[3].startswith("employee_id,") for call in calls)
