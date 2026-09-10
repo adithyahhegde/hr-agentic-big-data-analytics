@@ -91,8 +91,14 @@ jobs:
           assert data['seed'] == 42
           assert data['sizes'] == [100, 1000, 10000]
           assert [m['rows'] for m in data['runs']] == data['sizes']
+          assert data['source_revision'] == os.environ['GITHUB_SHA']
+          assert data['source_revision'] != 'unknown'
+          assert isinstance(data['runtime']['python_version'], str) and data['runtime']['python_version']
+          assert isinstance(data['runtime']['platform'], str) and data['runtime']['platform']
           expected_version = os.environ['SPARK_VALIDATION_VERSION']
           for measurement in data['runs']:
+              assert len(measurement['fixture_sha256']) == 64
+              assert measurement['fixture_schema']
               validation = measurement['validation']
               execution = measurement['result']['execution']
               assert validation['row_count_matches_fixture'] is True
