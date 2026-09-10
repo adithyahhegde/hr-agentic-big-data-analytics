@@ -30,7 +30,7 @@ REQUIRED_MARKERS = {
         "[x] Documentation consistency audit after final feature freeze.",
     ),
     "docs/EVALUATION_RESULTS.md": (
-        "The reproducible evaluation workflow completed successfully on 2026-09-09 UTC",
+        "GitHub Actions run `34520418685` (Ephemeral Spark Validation, run number `49`) completed successfully",
         "External Spark scalability remains unverified",
         "do not establish generalization to real-world heterogeneous HR schemas",
     ),
