@@ -77,12 +77,20 @@ def _aggregate_signature(result: dict[str, Any]) -> dict[str, Any]:
             "distinct": item.get("distinct"),
             "top_values": top_values,
         })
+    # The local analyzer intentionally reports only fields with observed
+    # missingness, while Spark reports every mapped field (including zero
+    # missing). Compare the shared semantic representation rather than treating
+    # an explicit zero as a disagreement.
+    missing_by_field = [
+        item for item in result.get("missing_by_field", [])
+        if item.get("missing", 0) != 0
+    ]
     return {
         "row_count": result.get("row_count"),
         "duplicate_row_count": result.get("duplicate_row_count"),
         "numeric_summary": sorted(numeric, key=lambda item: item["field"] or ""),
         "categorical_summary": sorted(categorical, key=lambda item: item["field"] or ""),
-        "missing_by_field": sorted(result.get("missing_by_field", []), key=lambda item: item.get("field", "")),
+        "missing_by_field": sorted(missing_by_field, key=lambda item: item.get("field", "")),
     }
 
 
