@@ -182,6 +182,30 @@ def test_external_validation_preserves_cluster_provenance(monkeypatch):
     assert result["validation"]["application_id_present"] is True
 
 
+def test_external_validation_rejects_target_spark_version_mismatch(monkeypatch):
+    monkeypatch.setenv("SPARK_VALIDATION_VERSION", "3.5.8")
+    _stub_local_baseline(monkeypatch)
+
+    def fake_analyze(*args, **kwargs):
+        return {**_aggregate_contract(10), "execution": _execution_contract()}
+
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
+    with pytest.raises(RuntimeError, match="version contract failed"):
+        validate(rows=10, master="spark://example:7077")
+
+
+def test_external_validation_accepts_target_spark_version_match(monkeypatch):
+    monkeypatch.setenv("SPARK_VALIDATION_VERSION", "4.0.0")
+    _stub_local_baseline(monkeypatch)
+
+    def fake_analyze(*args, **kwargs):
+        return {**_aggregate_contract(10), "execution": _execution_contract()}
+
+    monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
+    result = validate(rows=10, master="spark://example:7077")
+    assert result["validation"]["spark_version_present"] is True
+
+
 def test_external_validation_requires_distributed_and_non_raw_result(monkeypatch):
     def fake_analyze(*args, **kwargs):
         return {
@@ -272,7 +296,7 @@ def test_external_validation_normalizes_explicit_zero_missing_fields():
     assert result["missing_by_field"] == [{"field": "salary", "missing": 1, "rate": 1.0}]
 
 
-def test_external_validation_accepts_matching_aggregate_baseline():
+def test_external_validation_accepts_matching_aggregate_baseline(monkeypatch):
     result = external_validation._validate_result(
         {
             "row_count": 1,
