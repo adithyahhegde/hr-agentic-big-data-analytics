@@ -100,3 +100,13 @@ def test_manual_external_workflow_supports_routable_driver_configuration():
     assert "HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS: ${{ secrets.HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS }}" in EXTERNAL_WORKFLOW
     assert 'os.environ.get("HR_ANALYTICS_SPARK_DRIVER_HOST", "").strip()' in EXTERNAL_WORKFLOW
     assert 'os.environ.get("HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS", "").strip()' in EXTERNAL_WORKFLOW
+
+
+def test_manual_external_workflow_pins_and_verifies_target_spark_runtime():
+    assert "spark_version:" in EXTERNAL_WORKFLOW
+    assert "default: '3.5.8'" in EXTERNAL_WORKFLOW
+    assert "SPARK_VALIDATION_VERSION: ${{ inputs.spark_version }}" in EXTERNAL_WORKFLOW
+    assert '"pyspark==${SPARK_VALIDATION_VERSION}"' in EXTERNAL_WORKFLOW
+    assert "Verify PySpark driver version" in EXTERNAL_WORKFLOW
+    assert "pyspark.__version__" in EXTERNAL_WORKFLOW
+    assert "execution['spark_version'] == expected_version" in EXTERNAL_WORKFLOW
