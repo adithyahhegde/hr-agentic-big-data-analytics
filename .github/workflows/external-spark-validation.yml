@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
       - name: Require a non-local target cluster
         run: |
           test -n "$HR_ANALYTICS_SPARK_MASTER" || { echo 'HR_ANALYTICS_SPARK_MASTER is required for this manual validation gate.'; exit 1; }
