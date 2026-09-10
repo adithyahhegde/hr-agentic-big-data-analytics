@@ -173,6 +173,9 @@ def test_external_validation_preserves_cluster_provenance(monkeypatch):
     assert execution["default_parallelism"] == 4
     assert execution["application_id"] == "app-123"
     assert execution["input_mode"] == "driver_parallelized_csv"
+    assert result["validation"]["spark_version_present"] is True
+    assert result["validation"]["parallelism_positive"] is True
+    assert result["validation"]["application_id_present"] is True
 
 
 def test_external_validation_requires_distributed_and_non_raw_result(monkeypatch):
@@ -294,3 +297,10 @@ def test_external_workflow_has_bounded_runner_timeout_and_target_preflight():
     assert "Target Spark master is not reachable from this runner" in EXTERNAL_WORKFLOW
     assert 'os.environ["HR_ANALYTICS_SPARK_MASTER"]' in EXTERNAL_WORKFLOW
     assert 'master = "$HR_ANALYTICS_SPARK_MASTER"' not in EXTERNAL_WORKFLOW
+
+
+def test_external_workflow_requires_bounded_spark_provenance():
+    assert "spark_version_present" in EXTERNAL_WORKFLOW
+    assert "parallelism_positive" in EXTERNAL_WORKFLOW
+    assert "application_id_present" in EXTERNAL_WORKFLOW
+    assert "input_mode'] == 'driver_parallelized_csv'" in EXTERNAL_WORKFLOW
