@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import os
+import platform
 import tempfile
 import time
 from datetime import datetime, timezone
@@ -145,6 +146,11 @@ def validate_sizes(*, sizes: Sequence[int] = DEFAULT_SIZES, seed: int = 42, mast
     normalized_sizes = _validate_sizes(sizes)
     configured_master = _validate_external_master(master)
     started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    source_revision = os.getenv("GITHUB_SHA") or os.getenv("HR_ANALYTICS_SOURCE_REVISION") or "unknown"
+    runtime = {
+        "python_version": platform.python_version(),
+        "platform": platform.platform(),
+    }
     runs: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="hr_external_spark_") as tmp:
         for rows in normalized_sizes:
@@ -173,6 +179,8 @@ def validate_sizes(*, sizes: Sequence[int] = DEFAULT_SIZES, seed: int = 42, mast
         "sizes": normalized_sizes,
         "seed": seed,
         "started_at": started_at,
+        "source_revision": source_revision,
+        "runtime": runtime,
         "master_kind": configured_master.split(":", 1)[0],
         "runs": runs,
         "limitation": "Results depend on the configured target Spark cluster, worker resources, Spark version, and network/filesystem configuration. Wall-clock measurements are target-environment evidence, not universal performance guarantees.",
