@@ -5,6 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = (ROOT / ".github" / "workflows" / "ephemeral-spark-validation.yml").read_text(encoding="utf-8")
+EVALUATION_WORKFLOW = (ROOT / ".github" / "workflows" / "evaluation.yml").read_text(encoding="utf-8")
+EXTERNAL_WORKFLOW = (ROOT / ".github" / "workflows" / "external-spark-validation.yml").read_text(encoding="utf-8")
 PYPROJECT = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
 
@@ -17,6 +19,18 @@ def test_ephemeral_spark_workflow_uses_worker_compatible_runtime_provisioning():
     assert "python3.11" not in WORKFLOW
     assert "cache: maven" not in WORKFLOW
     assert 'requires-python = ">=3.10"' in PYPROJECT
+
+
+def test_all_spark_evaluation_workflows_match_supported_python_runtime():
+    assert "python-version: '3.10'" in EVALUATION_WORKFLOW
+    assert "python-version: '3.10'" in EXTERNAL_WORKFLOW
+    assert "python-version: '3.11'" not in EVALUATION_WORKFLOW
+    assert "python-version: '3.11'" not in EXTERNAL_WORKFLOW
+
+
+def test_evaluation_workflow_runs_when_project_metadata_changes():
+    assert "- 'pyproject.toml'" in EVALUATION_WORKFLOW
+    assert "- 'pyproject.toml'" in WORKFLOW
 
 
 def test_ephemeral_spark_workflow_uses_explicit_pinned_spark_processes():
@@ -48,3 +62,11 @@ def test_ephemeral_spark_workflow_configures_routable_driver_and_evidence_contra
     assert "aggregates_match_local_baseline" in WORKFLOW
     assert "raw_rows_returned" in WORKFLOW
     assert "rows_per_second" in WORKFLOW
+
+
+def test_manual_external_workflow_keeps_target_cluster_gate():
+    assert "HR_ANALYTICS_SPARK_MASTER: ${{ secrets.HR_ANALYTICS_SPARK_MASTER }}" in EXTERNAL_WORKFLOW
+    assert "Require a non-local target cluster" in EXTERNAL_WORKFLOW
+    assert "socket.create_connection" in EXTERNAL_WORKFLOW
+    assert "external_spark_scalability_v2" in EXTERNAL_WORKFLOW
+    assert "aggregates_match_local_baseline" in EXTERNAL_WORKFLOW
