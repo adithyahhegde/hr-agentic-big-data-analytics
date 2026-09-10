@@ -229,7 +229,7 @@ def test_external_validation_returns_verified_contract(monkeypatch):
     assert result["rows_per_second"] > 0
 
 
-def test_external_validation_rejects_aggregate_mismatch(monkeypatch):
+def test_external_validation_rejects_aggregate_mismatch_with_actionable_path(monkeypatch):
     def fake_analyze(path_lines, mappings, **kwargs):
         rows = len(path_lines) - 1
         return {
@@ -239,8 +239,14 @@ def test_external_validation_rejects_aggregate_mismatch(monkeypatch):
         }
 
     monkeypatch.setattr(external_validation, "analyze_spark_csv_lines", fake_analyze)
-    with pytest.raises(RuntimeError, match="aggregates differ"):
+    with pytest.raises(RuntimeError, match=r"root\.numeric_summary: list lengths differ"):
         validate(rows=10, seed=42, master="spark://example:7077")
+
+
+def test_first_aggregate_difference_accepts_float_tolerance():
+    actual = {"mean": 1.0000001}
+    expected = {"mean": 1.0}
+    assert external_validation._first_aggregate_difference(actual, expected) is None
 
 
 def test_external_validation_normalizes_explicit_zero_missing_fields():
