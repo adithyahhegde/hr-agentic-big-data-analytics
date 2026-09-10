@@ -62,7 +62,10 @@ def analyze_csv(path: Path, mappings: dict[str, str], max_categories: int = 5) -
     categorical_summary = []
     for field, counts in sorted(categorical.items()):
         total = sum(counts.values())
-        categorical_summary.append({"field": field, "count": total, "distinct": len(counts), "top_values": [{"value": value, "count": count, "share": round(count / total, 4)} for value, count in counts.most_common(max_categories)]})
+        # Explicitly break equal-count ties by value so local and Spark
+        # execution produce byte-for-byte stable aggregate ordering.
+        ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:max_categories]
+        categorical_summary.append({"field": field, "count": total, "distinct": len(counts), "top_values": [{"value": value, "count": count, "share": round(count / total, 4)} for value, count in ranked]})
 
     insights: list[dict[str, Any]] = []
     for field, count in sorted(missing.items()):
