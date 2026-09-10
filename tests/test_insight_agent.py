@@ -83,3 +83,17 @@ def test_synthesis_accepts_nested_dataset_provenance():
     )
     assert len(result["evidence"]) == 1
     assert result["evidence"][0]["type"] == "PREDICTIVE"
+
+
+def test_synthesis_rejects_conflicting_top_level_and_nested_provenance():
+    result = synthesize(
+        {"dataset_fingerprint": "current", "insights": []},
+        [{
+            "objective": "attrition_classification",
+            "selected_model": "model-a",
+            "dataset_fingerprint": "current",
+            "provenance": {"dataset_fingerprint": "stale"},
+        }],
+    )
+    assert result["evidence"] == []
+    assert "1 analytical run(s) were excluded" in result["limitations"][-1]
