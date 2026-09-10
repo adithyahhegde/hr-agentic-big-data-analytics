@@ -58,7 +58,7 @@ def test_ephemeral_spark_workflow_uses_explicit_pinned_spark_processes():
 
 
 def test_ephemeral_spark_workflow_pins_driver_to_cluster_version():
-    assert f'pip install -e \'.[dev,bigdata]' "pyspark==${{SPARK_VALIDATION_VERSION}}"' in WORKFLOW
+    assert 'pyspark==${SPARK_VALIDATION_VERSION}' in WORKFLOW
     assert "import pyspark" in WORKFLOW
     assert "pyspark.__version__ == expected" in WORKFLOW
     assert "PySpark driver/cluster version contract" in WORKFLOW
