@@ -21,15 +21,22 @@ def _text(value: Any, default: str) -> str:
 
 def _same_dataset(analytics: dict[str, Any], result: dict[str, Any]) -> bool:
     analytics_fingerprint = analytics.get("dataset_fingerprint")
+    if not analytics_fingerprint:
+        return True
+
     result_fingerprint = result.get("dataset_fingerprint")
-    if analytics_fingerprint:
-        if result_fingerprint:
-            return result_fingerprint == analytics_fingerprint
-        provenance = result.get("provenance")
-        if isinstance(provenance, dict):
-            return provenance.get("dataset_fingerprint") == analytics_fingerprint
+    provenance = result.get("provenance")
+    provenance_fingerprint = provenance.get("dataset_fingerprint") if isinstance(provenance, dict) else None
+
+    # A result may carry its lineage in either location, but if both are
+    # present they must agree. Never accept contradictory provenance merely
+    # because one copy happens to match the current dataset.
+    fingerprints = [value for value in (result_fingerprint, provenance_fingerprint) if value]
+    if not fingerprints:
         return False
-    return True
+    if len(set(fingerprints)) != 1:
+        return False
+    return fingerprints[0] == analytics_fingerprint
 
 
 def _add_evidence(evidence: list[dict[str, Any]], item: dict[str, Any]) -> str:
