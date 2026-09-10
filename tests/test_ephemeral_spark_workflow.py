@@ -12,6 +12,7 @@ PYPROJECT = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 PYTHON_RUNTIME = "3.10"
+SPARK_VALIDATION_VERSION = "3.5.8"
 
 
 def test_ephemeral_spark_workflow_uses_worker_compatible_runtime_provisioning():
@@ -48,11 +49,19 @@ def test_evaluation_workflow_runs_when_project_metadata_changes():
 
 
 def test_ephemeral_spark_workflow_uses_explicit_pinned_spark_processes():
-    assert "apache/spark:3.5.8-python3" in WORKFLOW
+    assert f"SPARK_VALIDATION_VERSION: '{SPARK_VALIDATION_VERSION}'" in WORKFLOW
+    assert f'"apache/spark:${{SPARK_VALIDATION_VERSION}}-python3"' in WORKFLOW
     assert "org.apache.spark.deploy.master.Master" in WORKFLOW
     assert "org.apache.spark.deploy.worker.Worker" in WORKFLOW
     assert "spark://spark-master:7077" in WORKFLOW
     assert "--cores 2 --memory 2g" in WORKFLOW
+
+
+def test_ephemeral_spark_workflow_pins_driver_to_cluster_version():
+    assert f'pip install -e \'.[dev,bigdata]' "pyspark==${{SPARK_VALIDATION_VERSION}}"' in WORKFLOW
+    assert "import pyspark" in WORKFLOW
+    assert "pyspark.__version__ == expected" in WORKFLOW
+    assert "PySpark driver/cluster version contract" in WORKFLOW
 
 
 def test_ephemeral_spark_workflow_validates_readiness_and_cleans_up():
