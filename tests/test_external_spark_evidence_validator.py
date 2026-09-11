@@ -20,6 +20,7 @@ def _valid_payload():
         "sizes": [100, 1000],
         "source_revision": "a" * 40,
         "runtime": {"python_version": "3.10.0", "platform": "test-platform"},
+        "target_fingerprint": "d" * 64,
         "runs": [
             {
                 "rows": 100,
@@ -76,6 +77,7 @@ def _valid_payload():
 def test_evidence_validator_accepts_complete_contract(tmp_path):
     summary = validate_evidence(_write(tmp_path, _valid_payload()))
     assert summary["source_revision"] == "a" * 40
+    assert summary["target_fingerprint"] == "d" * 64
     assert summary["run_count"] == 2
     assert summary["sizes"] == [100, 1000]
 
@@ -85,6 +87,14 @@ def test_evidence_validator_rejects_invalid_source_revision(tmp_path, revision):
     payload = _valid_payload()
     payload["source_revision"] = revision
     with pytest.raises(ValueError, match="40-character lowercase Git commit SHA"):
+        validate_evidence(_write(tmp_path, payload))
+
+
+@pytest.mark.parametrize("target_fingerprint", ["", "unknown", "A" * 64, "d" * 63, "d" * 65])
+def test_evidence_validator_rejects_invalid_target_fingerprint(tmp_path, target_fingerprint):
+    payload = _valid_payload()
+    payload["target_fingerprint"] = target_fingerprint
+    with pytest.raises(ValueError, match="target_fingerprint"):
         validate_evidence(_write(tmp_path, payload))
 
 
