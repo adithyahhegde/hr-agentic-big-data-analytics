@@ -69,7 +69,9 @@ def audit(root: Path) -> list[str]:
     elif any(int(run_id) <= 0 for run_id in run_matches):
         errors.append("docs/EVALUATION_RESULTS.md: GitHub Actions run identifier must be positive")
 
-    revision_matches = re.findall(r"for commit `([0-9a-f]+)`", results)
+    # Capture the complete token so malformed-but-present provenance is reported as malformed,
+    # rather than being mistaken for a missing commit identifier.
+    revision_matches = re.findall(r"for commit `([^`]+)`", results)
     if not revision_matches:
         errors.append("docs/EVALUATION_RESULTS.md: missing evaluation commit identifier")
     elif any(not re.fullmatch(r"[0-9a-f]{40}", revision) for revision in revision_matches):
