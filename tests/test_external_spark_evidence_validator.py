@@ -28,23 +28,8 @@ def _valid_payload():
                 "fixture_schema": ["age", "department"],
                 "elapsed_seconds": 1.25,
                 "rows_per_second": 80.0,
-                "validation": {
-                    "row_count_matches_fixture": True,
-                    "distributed": True,
-                    "raw_rows_returned": False,
-                    "aggregates_match_local_baseline": True,
-                    "spark_version_present": True,
-                    "parallelism_positive": True,
-                    "application_id_present": True,
-                },
-                "result": {
-                    "execution": {
-                        "spark_version": "3.5.8",
-                        "default_parallelism": 2,
-                        "application_id": "app-test-100",
-                        "input_mode": "driver_parallelized_csv",
-                    }
-                },
+                "validation": {"row_count_matches_fixture": True, "distributed": True, "raw_rows_returned": False, "aggregates_match_local_baseline": True, "spark_version_present": True, "parallelism_positive": True, "application_id_present": True},
+                "result": {"execution": {"spark_version": "3.5.8", "default_parallelism": 2, "application_id": "app-test-100", "input_mode": "driver_parallelized_csv"}},
             },
             {
                 "rows": 1000,
@@ -52,34 +37,49 @@ def _valid_payload():
                 "fixture_schema": ["age", "department"],
                 "elapsed_seconds": 2.5,
                 "rows_per_second": 400.0,
-                "validation": {
-                    "row_count_matches_fixture": True,
-                    "distributed": True,
-                    "raw_rows_returned": False,
-                    "aggregates_match_local_baseline": True,
-                    "spark_version_present": True,
-                    "parallelism_positive": True,
-                    "application_id_present": True,
-                },
-                "result": {
-                    "execution": {
-                        "spark_version": "3.5.8",
-                        "default_parallelism": 2,
-                        "application_id": "app-test-1000",
-                        "input_mode": "driver_parallelized_csv",
-                    }
-                },
+                "validation": {"row_count_matches_fixture": True, "distributed": True, "raw_rows_returned": False, "aggregates_match_local_baseline": True, "spark_version_present": True, "parallelism_positive": True, "application_id_present": True},
+                "result": {"execution": {"spark_version": "3.5.8", "default_parallelism": 2, "application_id": "app-test-1000", "input_mode": "driver_parallelized_csv"}},
             },
         ],
     }
 
 
-def test_evidence_validator_accepts_complete_contract(tmp_path):
+def test_evidence_validator_accepts_complete_contract(tmp_path, monkeypatch):
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+    monkeypatch.delenv("HR_ANALYTICS_SPARK_MASTER", raising=False)
     summary = validate_evidence(_write(tmp_path, _valid_payload()))
     assert summary["source_revision"] == "a" * 40
     assert summary["target_fingerprint"] == "d" * 64
     assert summary["run_count"] == 2
     assert summary["sizes"] == [100, 1000]
+
+
+def test_evidence_validator_rejects_source_revision_drift_against_github_sha(tmp_path, monkeypatch):
+    monkeypatch.setenv("GITHUB_SHA", "b" * 40)
+    with pytest.raises(ValueError, match="source_revision.*GITHUB_SHA"):
+        validate_evidence(_write(tmp_path, _valid_payload()))
+
+
+def test_evidence_validator_accepts_matching_github_sha(tmp_path, monkeypatch):
+    monkeypatch.setenv("GITHUB_SHA", "a" * 40)
+    monkeypatch.delenv("HR_ANALYTICS_SPARK_MASTER", raising=False)
+    validate_evidence(_write(tmp_path, _valid_payload()))
+
+
+def test_evidence_validator_rejects_target_fingerprint_drift_against_master(tmp_path, monkeypatch):
+    monkeypatch.setenv("HR_ANALYTICS_SPARK_MASTER", "spark://cluster.example:7077")
+    with pytest.raises(ValueError, match="target_fingerprint.*HR_ANALYTICS_SPARK_MASTER"):
+        validate_evidence(_write(tmp_path, _valid_payload()))
+
+
+def test_evidence_validator_accepts_matching_target_fingerprint(tmp_path, monkeypatch):
+    import hashlib
+    payload = _valid_payload()
+    master = "spark://cluster.example:7077"
+    payload["target_fingerprint"] = hashlib.sha256(master.encode()).hexdigest()
+    monkeypatch.setenv("HR_ANALYTICS_SPARK_MASTER", master)
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+    validate_evidence(_write(tmp_path, payload))
 
 
 def test_evidence_validator_rejects_inconsistent_spark_versions(tmp_path):
@@ -135,10 +135,7 @@ def test_evidence_validator_requires_runs(tmp_path):
 
 
 def test_evidence_validator_rejects_protocol_or_seed_drift(tmp_path):
-    for field, value, message in [
-        ("protocol", "other", "protocol"),
-        ("seed", 7, "seed"),
-    ]:
+    for field, value, message in [("protocol", "other", "protocol"), ("seed", 7, "seed")]:
         payload = _valid_payload()
         payload[field] = value
         with pytest.raises(ValueError, match=message):
@@ -168,11 +165,7 @@ def test_evidence_validator_rejects_invalid_fixture_provenance(tmp_path):
 
 
 def test_evidence_validator_rejects_failed_aggregate_or_raw_row_checks(tmp_path):
-    for key, value, message in [
-        ("aggregates_match_local_baseline", False, "aggregate"),
-        ("raw_rows_returned", True, "raw rows"),
-        ("distributed", False, "distributed"),
-    ]:
+    for key, value, message in [("aggregates_match_local_baseline", False, "aggregate"), ("raw_rows_returned", True, "raw rows"), ("distributed", False, "distributed")]:
         payload = _valid_payload()
         payload["runs"][0]["validation"][key] = value
         with pytest.raises(ValueError, match=message):

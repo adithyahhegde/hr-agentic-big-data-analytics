@@ -1,13 +1,16 @@
 """Validate provenance and bounded aggregate evidence in an external Spark artifact.
 
 This intentionally validates metadata and aggregate validation flags only; it never
-inspects or prints employee rows.
+inspects or prints employee rows. When run inside the validation workflow, available
+GitHub/target environment variables are also checked against the recorded provenance.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
+import os
 import re
 from pathlib import Path
 
@@ -39,6 +42,10 @@ def validate_evidence(path: Path) -> dict:
     source_revision = data.get("source_revision")
     if not isinstance(source_revision, str) or not SOURCE_REVISION_RE.fullmatch(source_revision):
         raise ValueError("evidence source_revision must be a 40-character lowercase Git commit SHA")
+    expected_revision = os.getenv("GITHUB_SHA", "").strip()
+    if expected_revision and source_revision != expected_revision:
+        raise ValueError("evidence source_revision does not match GITHUB_SHA")
+
     runtime = data.get("runtime")
     if not isinstance(runtime, dict):
         raise ValueError("evidence runtime provenance is required")
@@ -49,6 +56,11 @@ def validate_evidence(path: Path) -> dict:
     target_fingerprint = data.get("target_fingerprint")
     if not isinstance(target_fingerprint, str) or not HEX_SHA256_RE.fullmatch(target_fingerprint):
         raise ValueError("evidence target_fingerprint must be a 64-character lowercase SHA-256")
+    configured_master = os.getenv("HR_ANALYTICS_SPARK_MASTER", "").strip()
+    if configured_master:
+        expected_target_fingerprint = hashlib.sha256(configured_master.encode("utf-8")).hexdigest()
+        if target_fingerprint != expected_target_fingerprint:
+            raise ValueError("evidence target_fingerprint does not match HR_ANALYTICS_SPARK_MASTER")
 
     runs = data.get("runs")
     if not isinstance(runs, list) or not runs:
