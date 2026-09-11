@@ -1,9 +1,5 @@
-"""Validate provenance and bounded aggregate evidence in an external Spark artifact.
+"""Validate externally produced Spark scalability evidence against the frozen protocol."""
 
-This intentionally validates metadata and aggregate validation flags only; it never
-inspects or prints employee rows. When run inside the validation workflow, available
-GitHub/target environment variables are also checked against the recorded provenance.
-"""
 from __future__ import annotations
 
 import argparse
@@ -14,16 +10,17 @@ import os
 import re
 from pathlib import Path
 
-SOURCE_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
-HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
 EXPECTED_PROTOCOL = "external_spark_scalability_v2"
 EXPECTED_SEED = 42
-EXPECTED_INPUT_MODE = "driver_parallelized_csv"
 EXPECTED_MASTER_KIND = "spark"
+EXPECTED_INPUT_MODE = "driver_parallelized_csv"
+SOURCE_REVISION_RE = re.compile(r"[0-9a-f]{40}")
+HEX_SHA256_RE = re.compile(r"[0-9a-f]{64}")
 
 
-def _finite_number(value: object, *, name: str) -> float:
-    if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)):
+def _finite_number(value, *, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         raise ValueError(f"{name} must be a finite number")
     return float(value)
 
@@ -146,13 +143,35 @@ def validate_evidence(path: Path) -> dict:
             raise ValueError("each evidence scaling comparison must be an object")
         if comparison.get("from_rows") != runs[index]["rows"] or comparison.get("to_rows") != runs[index + 1]["rows"]:
             raise ValueError("evidence scaling comparison row bounds do not match benchmark runs")
-        for key in ("row_growth_factor", "elapsed_growth_factor", "throughput_growth_factor"):
-            if _finite_number(comparison.get(key), name=f"scaling.{key}") <= 0:
-                raise ValueError(f"scaling.{key} must be positive")
+        row_growth = _finite_number(comparison.get("row_growth_factor"), name="scaling.row_growth_factor")
+        elapsed_growth = _finite_number(comparison.get("elapsed_growth_factor"), name="scaling.elapsed_growth_factor")
+        throughput_growth = _finite_number(comparison.get("throughput_growth_factor"), name="scaling.throughput_growth_factor")
+        if row_growth <= 0:
+            raise ValueError("scaling.row_growth_factor must be positive")
+        if elapsed_growth <= 0:
+            raise ValueError("scaling.elapsed_growth_factor must be positive")
+        if throughput_growth <= 0:
+            raise ValueError("scaling.throughput_growth_factor must be positive")
+        expected_row_growth = runs[index + 1]["rows"] / runs[index]["rows"]
+        expected_elapsed_growth = runs[index + 1]["elapsed_seconds"] / runs[index]["elapsed_seconds"]
+        expected_throughput_growth = runs[index + 1]["rows_per_second"] / runs[index]["rows_per_second"]
+        if not math.isclose(row_growth, expected_row_growth, rel_tol=1e-6, abs_tol=1e-9):
+            raise ValueError("scaling.row_growth_factor does not match benchmark runs")
+        if not math.isclose(elapsed_growth, expected_elapsed_growth, rel_tol=1e-6, abs_tol=1e-9):
+            raise ValueError("scaling.elapsed_growth_factor does not match benchmark runs")
+        if not math.isclose(throughput_growth, expected_throughput_growth, rel_tol=1e-6, abs_tol=1e-9):
+            raise ValueError("scaling.throughput_growth_factor does not match benchmark runs")
     if len(runs) >= 2:
-        for key in ("largest_to_smallest_elapsed_ratio", "largest_to_smallest_throughput_ratio"):
-            if _finite_number(scaling.get(key), name=f"scaling.{key}") <= 0:
+        expected_ratios = {
+            "largest_to_smallest_elapsed_ratio": runs[-1]["elapsed_seconds"] / runs[0]["elapsed_seconds"],
+            "largest_to_smallest_throughput_ratio": runs[-1]["rows_per_second"] / runs[0]["rows_per_second"],
+        }
+        for key, expected in expected_ratios.items():
+            actual = _finite_number(scaling.get(key), name=f"scaling.{key}")
+            if actual <= 0:
                 raise ValueError(f"scaling.{key} must be positive")
+            if not math.isclose(actual, expected, rel_tol=1e-6, abs_tol=1e-9):
+                raise ValueError(f"scaling.{key} does not match benchmark runs")
 
     return {
         "source_revision": source_revision,
