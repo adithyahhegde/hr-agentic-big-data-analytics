@@ -56,16 +56,20 @@ def validate_evidence(path: Path) -> dict:
     if [run.get("rows") for run in runs] != sizes:
         raise ValueError("evidence run row counts must exactly match sizes")
 
+    spark_versions: list[str] = []
+    application_ids: list[str] = []
     for run in runs:
         fingerprint = run.get("fixture_sha256")
         if not isinstance(fingerprint, str) or not HEX_SHA256_RE.fullmatch(fingerprint):
             raise ValueError("each evidence run requires a 64-character lowercase fixture_sha256")
         if not isinstance(run.get("fixture_schema"), list) or not run["fixture_schema"]:
             raise ValueError("each evidence run requires a non-empty fixture_schema")
+        if not isinstance(run.get("rows"), int) or isinstance(run.get("rows"), bool) or run["rows"] <= 0:
+            raise ValueError("each evidence run requires positive rows")
         elapsed = _finite_number(run.get("elapsed_seconds"), name="elapsed_seconds")
         throughput = _finite_number(run.get("rows_per_second"), name="rows_per_second")
-        if elapsed < 0:
-            raise ValueError("each evidence run requires non-negative elapsed_seconds")
+        if elapsed <= 0:
+            raise ValueError("each evidence run requires positive elapsed_seconds")
         if throughput <= 0:
             raise ValueError("each evidence run requires positive rows_per_second")
 
@@ -97,17 +101,25 @@ def validate_evidence(path: Path) -> dict:
         execution = run.get("result", {}).get("execution")
         if not isinstance(execution, dict):
             raise ValueError("each evidence run requires execution provenance")
-        if not isinstance(execution.get("spark_version"), str) or not execution["spark_version"].strip():
+        spark_version = execution.get("spark_version")
+        if not isinstance(spark_version, str) or not spark_version.strip():
             raise ValueError("each evidence run requires execution.spark_version")
-        if not isinstance(execution.get("default_parallelism"), int) or isinstance(execution.get("default_parallelism"), bool) or execution["default_parallelism"] <= 0:
+        parallelism = execution.get("default_parallelism")
+        if not isinstance(parallelism, int) or isinstance(parallelism, bool) or parallelism <= 0:
             raise ValueError("each evidence run requires positive execution.default_parallelism")
-        if not isinstance(execution.get("application_id"), str) or not execution["application_id"].strip():
+        application_id = execution.get("application_id")
+        if not isinstance(application_id, str) or not application_id.strip():
             raise ValueError("each evidence run requires execution.application_id")
         if execution.get("input_mode") != EXPECTED_INPUT_MODE:
             raise ValueError(f"evidence input_mode must be {EXPECTED_INPUT_MODE}")
+        spark_versions.append(spark_version)
+        application_ids.append(application_id)
 
-    # Older artifacts remain readable, but if a producer includes the optional
-    # scaling summary, validate it strictly rather than trusting derived ratios.
+    if len(set(spark_versions)) != 1:
+        raise ValueError("all evidence runs must use the same Spark version")
+    if len(set(application_ids)) != len(application_ids):
+        raise ValueError("evidence application IDs must be unique per benchmark run")
+
     scaling = data.get("scaling")
     if scaling is not None:
         if not isinstance(scaling, dict):

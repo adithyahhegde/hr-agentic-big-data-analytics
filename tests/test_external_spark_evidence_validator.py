@@ -82,6 +82,27 @@ def test_evidence_validator_accepts_complete_contract(tmp_path):
     assert summary["sizes"] == [100, 1000]
 
 
+def test_evidence_validator_rejects_inconsistent_spark_versions(tmp_path):
+    payload = _valid_payload()
+    payload["runs"][1]["result"]["execution"]["spark_version"] = "3.5.7"
+    with pytest.raises(ValueError, match="same Spark version"):
+        validate_evidence(_write(tmp_path, payload))
+
+
+def test_evidence_validator_rejects_duplicate_application_ids(tmp_path):
+    payload = _valid_payload()
+    payload["runs"][1]["result"]["execution"]["application_id"] = "app-test-100"
+    with pytest.raises(ValueError, match="application IDs must be unique"):
+        validate_evidence(_write(tmp_path, payload))
+
+
+def test_evidence_validator_rejects_zero_elapsed_time(tmp_path):
+    payload = _valid_payload()
+    payload["runs"][0]["elapsed_seconds"] = 0
+    with pytest.raises(ValueError, match="positive elapsed_seconds"):
+        validate_evidence(_write(tmp_path, payload))
+
+
 @pytest.mark.parametrize("revision", ["unknown", "", "A" * 40, "a" * 39, "a" * 41])
 def test_evidence_validator_rejects_invalid_source_revision(tmp_path, revision):
     payload = _valid_payload()
