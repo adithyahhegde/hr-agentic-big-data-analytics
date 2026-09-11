@@ -87,6 +87,7 @@ jobs:
           from pathlib import Path
           p = Path('artifacts/external-spark.json')
           data = json.loads(p.read_text())
+          expected_version = os.environ['SPARK_VALIDATION_VERSION']
           assert data['protocol'] == 'external_spark_scalability_v2'
           assert data['seed'] == 42
           assert data['sizes'] == [100, 1000, 10000]
