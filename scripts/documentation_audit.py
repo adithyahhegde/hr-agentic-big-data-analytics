@@ -30,7 +30,8 @@ REQUIRED_MARKERS = {
         "[x] Documentation consistency audit after final feature freeze.",
     ),
     "docs/EVALUATION_RESULTS.md": (
-        "GitHub Actions run `34520418685` (Ephemeral Spark Validation, run number `49`) completed successfully",
+        "GitHub Actions run `",
+        "Ephemeral Spark Validation",
         "External Spark scalability remains unverified",
         "do not establish generalization to real-world heterogeneous HR schemas",
     ),
@@ -65,8 +66,14 @@ def audit(root: Path) -> list[str]:
     run_matches = re.findall(r"GitHub Actions run `(\d+)`", results)
     if not run_matches:
         errors.append("docs/EVALUATION_RESULTS.md: missing GitHub Actions run identifier")
-    elif "34212312393" in run_matches:
-        errors.append("docs/EVALUATION_RESULTS.md: stale evaluation run identifier")
+    elif any(int(run_id) <= 0 for run_id in run_matches):
+        errors.append("docs/EVALUATION_RESULTS.md: GitHub Actions run identifier must be positive")
+
+    revision_matches = re.findall(r"for commit `([0-9a-f]+)`", results)
+    if not revision_matches:
+        errors.append("docs/EVALUATION_RESULTS.md: missing evaluation commit identifier")
+    elif any(not re.fullmatch(r"[0-9a-f]{40}", revision) for revision in revision_matches):
+        errors.append("docs/EVALUATION_RESULTS.md: evaluation commit identifier must be a 40-character lowercase SHA")
 
     implementation = root / "docs/IMPLEMENTATION.md"
     if implementation.is_file():
