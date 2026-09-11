@@ -106,28 +106,27 @@ def validate_evidence(path: Path) -> dict:
         if execution.get("input_mode") != EXPECTED_INPUT_MODE:
             raise ValueError(f"evidence input_mode must be {EXPECTED_INPUT_MODE}")
 
+    # Older artifacts remain readable, but if a producer includes the optional
+    # scaling summary, validate it strictly rather than trusting derived ratios.
     scaling = data.get("scaling")
-    if not isinstance(scaling, dict):
-        raise ValueError("evidence scaling summary is required")
-    comparisons = scaling.get("adjacent_comparisons")
-    if not isinstance(comparisons, list) or len(comparisons) != max(0, len(runs) - 1):
-        raise ValueError("evidence scaling adjacent_comparisons must match the number of benchmark intervals")
-    for index, comparison in enumerate(comparisons):
-        if not isinstance(comparison, dict):
-            raise ValueError("each evidence scaling comparison must be an object")
-        expected_from = runs[index]["rows"]
-        expected_to = runs[index + 1]["rows"]
-        if comparison.get("from_rows") != expected_from or comparison.get("to_rows") != expected_to:
-            raise ValueError("evidence scaling comparison row bounds do not match benchmark runs")
-        for key in ("row_growth_factor", "elapsed_growth_factor", "throughput_growth_factor"):
-            value = _finite_number(comparison.get(key), name=f"scaling.{key}")
-            if value <= 0:
-                raise ValueError(f"scaling.{key} must be positive")
-    if len(runs) >= 2:
-        for key in ("largest_to_smallest_elapsed_ratio", "largest_to_smallest_throughput_ratio"):
-            value = _finite_number(scaling.get(key), name=f"scaling.{key}")
-            if value <= 0:
-                raise ValueError(f"scaling.{key} must be positive")
+    if scaling is not None:
+        if not isinstance(scaling, dict):
+            raise ValueError("evidence scaling summary must be an object when present")
+        comparisons = scaling.get("adjacent_comparisons")
+        if not isinstance(comparisons, list) or len(comparisons) != max(0, len(runs) - 1):
+            raise ValueError("evidence scaling adjacent_comparisons must match the number of benchmark intervals")
+        for index, comparison in enumerate(comparisons):
+            if not isinstance(comparison, dict):
+                raise ValueError("each evidence scaling comparison must be an object")
+            if comparison.get("from_rows") != runs[index]["rows"] or comparison.get("to_rows") != runs[index + 1]["rows"]:
+                raise ValueError("evidence scaling comparison row bounds do not match benchmark runs")
+            for key in ("row_growth_factor", "elapsed_growth_factor", "throughput_growth_factor"):
+                if _finite_number(comparison.get(key), name=f"scaling.{key}") <= 0:
+                    raise ValueError(f"scaling.{key} must be positive")
+        if len(runs) >= 2:
+            for key in ("largest_to_smallest_elapsed_ratio", "largest_to_smallest_throughput_ratio"):
+                if _finite_number(scaling.get(key), name=f"scaling.{key}") <= 0:
+                    raise ValueError(f"scaling.{key} must be positive")
 
     return {
         "source_revision": source_revision,
@@ -136,7 +135,7 @@ def validate_evidence(path: Path) -> dict:
         "platform": runtime["platform"],
         "run_count": len(runs),
         "sizes": sizes,
-        "scaling_intervals": len(comparisons),
+        "scaling_intervals": len(scaling["adjacent_comparisons"]) if isinstance(scaling, dict) else 0,
     }
 
 
