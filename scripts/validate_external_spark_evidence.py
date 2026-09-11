@@ -19,6 +19,7 @@ HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 EXPECTED_PROTOCOL = "external_spark_scalability_v2"
 EXPECTED_SEED = 42
 EXPECTED_INPUT_MODE = "driver_parallelized_csv"
+EXPECTED_MASTER_KIND = "spark"
 
 
 def _finite_number(value: object, *, name: str) -> float:
@@ -52,6 +53,10 @@ def validate_evidence(path: Path) -> dict:
     for key in ("python_version", "platform"):
         if not isinstance(runtime.get(key), str) or not runtime[key].strip():
             raise ValueError(f"evidence runtime.{key} is required")
+
+    master_kind = data.get("master_kind")
+    if master_kind != EXPECTED_MASTER_KIND:
+        raise ValueError(f"evidence master_kind must be {EXPECTED_MASTER_KIND}")
 
     target_fingerprint = data.get("target_fingerprint")
     if not isinstance(target_fingerprint, str) or not HEX_SHA256_RE.fullmatch(target_fingerprint):
