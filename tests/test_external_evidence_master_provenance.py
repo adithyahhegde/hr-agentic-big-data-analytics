@@ -8,6 +8,12 @@ import pytest
 from scripts.validate_external_spark_evidence import validate_evidence
 
 
+@pytest.fixture(autouse=True)
+def _clean_validation_environment(monkeypatch):
+    for name in ("GITHUB_SHA", "HR_ANALYTICS_SPARK_MASTER", "SPARK_VALIDATION_VERSION"):
+        monkeypatch.delenv(name, raising=False)
+
+
 def _payload() -> dict:
     execution = {
         "spark_version": "3.5.8",
