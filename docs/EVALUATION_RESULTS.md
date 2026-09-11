@@ -20,6 +20,8 @@ The external evidence gate uses a reusable validator (`scripts/validate_external
 
 No independent external-cluster scalability result is currently claimed. A valid final result must come from a reachable non-local Spark master and retain the generated `external-spark.json` artifact. A skipped external step, local Spark execution, or ephemeral CI cluster is not evidence of independent external scalability.
 
+The remaining gate is tracked as GitHub issue #7, with an operator handoff in `docs/EXTERNAL_SPARK_VALIDATION_RUNBOOK.md`.
+
 ## Reproducibility
 
 - Seed: `42`
