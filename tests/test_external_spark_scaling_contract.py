@@ -8,6 +8,12 @@ import pytest
 from scripts.validate_external_spark_evidence import validate_evidence
 
 
+@pytest.fixture(autouse=True)
+def _clean_validation_environment(monkeypatch):
+    for name in ("GITHUB_SHA", "HR_ANALYTICS_SPARK_MASTER", "SPARK_VALIDATION_VERSION"):
+        monkeypatch.delenv(name, raising=False)
+
+
 def _artifact(tmp_path: Path, **overrides):
     runs = [
         {"rows": 100, "fixture_sha256": "a" * 64, "fixture_schema": ["employee_id"], "elapsed_seconds": 1.0, "rows_per_second": 100.0, "validation": {"row_count_matches_fixture": True, "distributed": True, "raw_rows_returned": False, "aggregates_match_local_baseline": True, "spark_version_present": True, "parallelism_positive": True, "application_id_present": True}, "result": {"execution": {"spark_version": "3.5.8", "default_parallelism": 2, "application_id": "app-1", "input_mode": "driver_parallelized_csv"}}},
