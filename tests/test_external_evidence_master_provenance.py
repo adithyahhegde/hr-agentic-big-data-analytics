@@ -49,6 +49,7 @@ def _payload() -> dict:
                 "validation": validation,
             }
         ],
+        "scaling": {"adjacent_comparisons": []},
     }
 
 
