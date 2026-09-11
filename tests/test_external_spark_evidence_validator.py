@@ -163,3 +163,19 @@ def test_evidence_validator_requires_execution_contract(tmp_path):
     payload["runs"][0]["result"]["execution"]["input_mode"] = "shared_filesystem"
     with pytest.raises(ValueError, match="input_mode"):
         validate_evidence(_write(tmp_path, payload))
+
+
+@pytest.mark.parametrize("field", ["elapsed_seconds", "rows_per_second"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_evidence_validator_rejects_non_finite_metrics(tmp_path, field, value):
+    payload = _valid_payload()
+    payload["runs"][0][field] = value
+    with pytest.raises(ValueError, match="finite number"):
+        validate_evidence(_write(tmp_path, payload))
+
+
+def test_evidence_validator_rejects_boolean_parallelism(tmp_path):
+    payload = _valid_payload()
+    payload["runs"][0]["result"]["execution"]["default_parallelism"] = True
+    with pytest.raises(ValueError, match="positive execution.default_parallelism"):
+        validate_evidence(_write(tmp_path, payload))
