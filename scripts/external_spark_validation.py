@@ -55,9 +55,7 @@ def _validate_external_master(master: str | None) -> str:
 
 def _validate_sizes(sizes: Sequence[int]) -> list[int]:
     sizes_list = list(sizes)
-    if not sizes_list or any(
-        not isinstance(size, int) or isinstance(size, bool) or size < 1 for size in sizes_list
-    ):
+    if not sizes_list or any(not isinstance(size, int) or isinstance(size, bool) or size < 1 for size in sizes_list):
         raise ValueError("sizes must contain positive integers")
     if len(set(sizes_list)) != len(sizes_list):
         raise ValueError("sizes must be unique so the scalability evidence matches the requested protocol")
@@ -82,10 +80,7 @@ def _aggregate_signature(result: dict[str, Any]) -> dict[str, Any]:
             "distinct": item.get("distinct"),
             "top_values": top_values,
         })
-    missing_by_field = [
-        item for item in result.get("missing_by_field", [])
-        if item.get("missing", 0) != 0
-    ]
+    missing_by_field = [item for item in result.get("missing_by_field", []) if item.get("missing", 0) != 0]
     return {
         "row_count": result.get("row_count"),
         "duplicate_row_count": result.get("duplicate_row_count"),
@@ -96,16 +91,10 @@ def _aggregate_signature(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def _aggregate_values_match(actual: Any, expected: Any) -> bool:
-    """Compare aggregate payloads while allowing harmless floating-point drift."""
     if isinstance(actual, dict) and isinstance(expected, dict):
-        return actual.keys() == expected.keys() and all(
-            _aggregate_values_match(actual[key], expected[key]) for key in expected
-        )
+        return actual.keys() == expected.keys() and all(_aggregate_values_match(actual[key], expected[key]) for key in expected)
     if isinstance(actual, list) and isinstance(expected, list):
-        return len(actual) == len(expected) and all(
-            _aggregate_values_match(actual_item, expected_item)
-            for actual_item, expected_item in zip(actual, expected)
-        )
+        return len(actual) == len(expected) and all(_aggregate_values_match(a, e) for a, e in zip(actual, expected))
     if isinstance(actual, float) or isinstance(expected, float):
         if actual is None or expected is None:
             return actual is expected
@@ -114,7 +103,6 @@ def _aggregate_values_match(actual: Any, expected: Any) -> bool:
 
 
 def _first_aggregate_difference(actual: Any, expected: Any, path: str = "root") -> str | None:
-    """Return one deterministic path/value mismatch for actionable CI diagnostics."""
     if isinstance(actual, dict) and isinstance(expected, dict):
         if actual.keys() != expected.keys():
             return f"{path}: keys differ (actual={sorted(actual)}, expected={sorted(expected)})"
@@ -160,10 +148,7 @@ def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dic
     if not validation["spark_version_present"]:
         raise RuntimeError("external Spark validation did not report the target Spark version")
     if expected_spark_version and execution.get("spark_version") != expected_spark_version:
-        raise RuntimeError(
-            "external Spark version contract failed: "
-            f"target={execution.get('spark_version')!r}, expected={expected_spark_version!r}"
-        )
+        raise RuntimeError(f"external Spark version contract failed: target={execution.get('spark_version')!r}, expected={expected_spark_version!r}")
     if expected_aggregates is not None:
         aggregate_fields = {"duplicate_row_count", "numeric_summary", "categorical_summary", "missing_by_field"}
         if not aggregate_fields.issubset(result):
@@ -177,6 +162,27 @@ def _validate_result(result: dict[str, Any], rows: int, expected_aggregates: dic
     return validation
 
 
+def _scaling_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Record descriptive adjacent-size scaling factors without imposing a performance threshold."""
+    comparisons: list[dict[str, Any]] = []
+    for previous, current in zip(runs, runs[1:]):
+        row_growth = current["rows"] / previous["rows"]
+        elapsed_growth = current["elapsed_seconds"] / previous["elapsed_seconds"]
+        throughput_growth = current["rows_per_second"] / previous["rows_per_second"]
+        comparisons.append({
+            "from_rows": previous["rows"],
+            "to_rows": current["rows"],
+            "row_growth_factor": round(row_growth, 6),
+            "elapsed_growth_factor": round(elapsed_growth, 6),
+            "throughput_growth_factor": round(throughput_growth, 6),
+        })
+    summary: dict[str, Any] = {"adjacent_comparisons": comparisons}
+    if len(runs) >= 2:
+        summary["largest_to_smallest_elapsed_ratio"] = round(runs[-1]["elapsed_seconds"] / runs[0]["elapsed_seconds"], 6)
+        summary["largest_to_smallest_throughput_ratio"] = round(runs[-1]["rows_per_second"] / runs[0]["rows_per_second"], 6)
+    return summary
+
+
 def validate(*, rows: int = 10_000, seed: int = 42, master: str | None = None) -> dict[str, Any]:
     normalized_rows = _validate_sizes((rows,))[0]
     return validate_sizes(sizes=(normalized_rows,), seed=seed, master=master, protocol=PROTOCOL_VERSION)["runs"][0]
@@ -188,10 +194,7 @@ def validate_sizes(*, sizes: Sequence[int] = DEFAULT_SIZES, seed: int = 42, mast
     expected_spark_version = os.getenv("SPARK_VALIDATION_VERSION", "").strip() or None
     started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     source_revision = os.getenv("GITHUB_SHA") or os.getenv("HR_ANALYTICS_SOURCE_REVISION") or "unknown"
-    runtime = {
-        "python_version": platform.python_version(),
-        "platform": platform.platform(),
-    }
+    runtime = {"python_version": platform.python_version(), "platform": platform.platform()}
     target_fingerprint = hashlib.sha256(configured_master.encode("utf-8")).hexdigest()
     runs: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="hr_external_spark_") as tmp:
@@ -207,12 +210,14 @@ def validate_sizes(*, sizes: Sequence[int] = DEFAULT_SIZES, seed: int = 42, mast
             result = analyze_spark_csv_lines(lines, MAPPINGS, master=configured_master, stop_session=True)
             elapsed = time.perf_counter() - started
             validation = _validate_result(result, rows, expected_aggregates, expected_spark_version)
+            if elapsed <= 0:
+                raise RuntimeError("external Spark validation produced a non-positive elapsed time")
             runs.append({
                 "rows": rows,
                 "fixture_sha256": fixture_sha256,
                 "fixture_schema": fixture_schema,
                 "elapsed_seconds": round(elapsed, 6),
-                "rows_per_second": round(rows / elapsed, 3) if elapsed > 0 else None,
+                "rows_per_second": round(rows / elapsed, 3),
                 "result": result,
                 "validation": validation,
             })
@@ -226,6 +231,7 @@ def validate_sizes(*, sizes: Sequence[int] = DEFAULT_SIZES, seed: int = 42, mast
         "master_kind": configured_master.split(":", 1)[0],
         "target_fingerprint": target_fingerprint,
         "runs": runs,
+        "scaling": _scaling_summary(runs),
         "limitation": "Results depend on the configured target Spark cluster, worker resources, Spark version, and network/filesystem configuration. Wall-clock measurements are target-environment evidence, not universal performance guarantees.",
     }
 

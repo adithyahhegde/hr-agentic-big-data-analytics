@@ -51,9 +51,7 @@ jobs:
               with socket.create_connection((parsed.hostname, parsed.port), timeout=5):
                   print("Target Spark master TCP endpoint is reachable.")
           except OSError as error:
-              raise SystemExit(
-                  f"Target Spark master is not reachable from this runner: {error}"
-              )
+              raise SystemExit(f"Target Spark master is not reachable from this runner: {error}")
           if os.environ.get("HR_ANALYTICS_SPARK_DRIVER_HOST", "").strip():
               print("Configured Spark driver host is present.")
           if os.environ.get("HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS", "").strip():
@@ -70,9 +68,7 @@ jobs:
 
           expected = os.environ["SPARK_VALIDATION_VERSION"]
           if pyspark.__version__ != expected:
-              raise SystemExit(
-                  f"PySpark driver/cluster version contract failed: driver={pyspark.__version__}, expected={expected}"
-              )
+              raise SystemExit(f"PySpark driver/cluster version contract failed: driver={pyspark.__version__}, expected={expected}")
           print(f"PySpark driver version matches target contract: {expected}")
           PY
       - name: Run external Spark protocol
@@ -83,6 +79,7 @@ jobs:
           import json
           import os
           from pathlib import Path
+
           p = Path('artifacts/external-spark.json')
           data = json.loads(p.read_text())
           expected_version = os.environ['SPARK_VALIDATION_VERSION']
@@ -95,8 +92,19 @@ jobs:
           assert isinstance(data['runtime']['python_version'], str) and data['runtime']['python_version']
           assert isinstance(data['runtime']['platform'], str) and data['runtime']['platform']
           assert data['master_kind'] == 'spark'
+          assert data['target_fingerprint']
           configured_master = os.environ['HR_ANALYTICS_SPARK_MASTER'].strip()
           assert configured_master
+          scaling = data['scaling']
+          assert len(scaling['adjacent_comparisons']) == len(data['runs']) - 1
+          for comparison, previous, current in zip(scaling['adjacent_comparisons'], data['runs'], data['runs'][1:]):
+              assert comparison['from_rows'] == previous['rows']
+              assert comparison['to_rows'] == current['rows']
+              assert comparison['row_growth_factor'] > 0
+              assert comparison['elapsed_growth_factor'] > 0
+              assert comparison['throughput_growth_factor'] > 0
+          assert scaling['largest_to_smallest_elapsed_ratio'] > 0
+          assert scaling['largest_to_smallest_throughput_ratio'] > 0
           for measurement in data['runs']:
               assert len(measurement['fixture_sha256']) == 64
               assert measurement['fixture_schema']
@@ -133,18 +141,16 @@ jobs:
           print(f"- Spark master kind: `{data['master_kind']}`")
           print(f"- Spark/PySpark version: `{data['runs'][0]['result']['execution']['spark_version']}`")
           print(f"- Fixture sizes: `{data['sizes']}`")
+          print(f"- Largest/smallest elapsed ratio: `{data['scaling']['largest_to_smallest_elapsed_ratio']}`")
+          print(f"- Largest/smallest throughput ratio: `{data['scaling']['largest_to_smallest_throughput_ratio']}`")
           print("")
           print("| Rows | Seconds | Rows/s | Parallelism | Application |")
           print("| ---: | ---: | ---: | ---: | --- |")
           for measurement in data["runs"]:
               execution = measurement["result"]["execution"]
-              print(
-                  f"| {measurement['rows']:,} | {measurement['elapsed_seconds']:.6f} "
-                  f"| {measurement['rows_per_second']:,.3f} | {execution['default_parallelism']} "
-                  f"| `{execution['application_id']}` |"
-              )
+              print(f"| {measurement['rows']:,} | {measurement['elapsed_seconds']:.6f} | {measurement['rows_per_second']:,.3f} | {execution['default_parallelism']} | `{execution['application_id']}` |")
           print("")
-          print("Evidence is aggregate-only and includes fixture, source-revision, runtime, Spark-version, parallelism, and application provenance.")
+          print("Evidence is aggregate-only and includes fixture, source-revision, runtime, Spark-version, parallelism, application, target-fingerprint, and scaling provenance.")
           PY
       - name: Upload validation artifact
         uses: actions/upload-artifact@v4
