@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
@@ -20,6 +21,7 @@ def _valid_payload():
         "sizes": [100, 1000],
         "source_revision": "a" * 40,
         "runtime": {"python_version": "3.10.0", "platform": "test-platform"},
+        "master_kind": "spark",
         "target_fingerprint": "d" * 64,
         "runs": [
             {
@@ -47,6 +49,7 @@ def _valid_payload():
 def test_evidence_validator_accepts_complete_contract(tmp_path, monkeypatch):
     monkeypatch.delenv("GITHUB_SHA", raising=False)
     monkeypatch.delenv("HR_ANALYTICS_SPARK_MASTER", raising=False)
+    monkeypatch.delenv("SPARK_VALIDATION_VERSION", raising=False)
     summary = validate_evidence(_write(tmp_path, _valid_payload()))
     assert summary["source_revision"] == "a" * 40
     assert summary["target_fingerprint"] == "d" * 64
@@ -73,7 +76,6 @@ def test_evidence_validator_rejects_target_fingerprint_drift_against_master(tmp_
 
 
 def test_evidence_validator_accepts_matching_target_fingerprint(tmp_path, monkeypatch):
-    import hashlib
     payload = _valid_payload()
     master = "spark://cluster.example:7077"
     payload["target_fingerprint"] = hashlib.sha256(master.encode()).hexdigest()
@@ -125,6 +127,17 @@ def test_evidence_validator_requires_runtime_provenance(tmp_path, runtime):
     payload["runtime"] = runtime
     with pytest.raises(ValueError, match="runtime"):
         validate_evidence(_write(tmp_path, payload))
+
+
+def test_evidence_validator_rejects_missing_or_wrong_master_kind(tmp_path):
+    for value in [None, "", "http"]:
+        payload = _valid_payload()
+        if value is None:
+            payload.pop("master_kind")
+        else:
+            payload["master_kind"] = value
+        with pytest.raises(ValueError, match="master_kind"):
+            validate_evidence(_write(tmp_path, payload))
 
 
 def test_evidence_validator_requires_runs(tmp_path):
@@ -193,3 +206,23 @@ def test_evidence_validator_rejects_boolean_parallelism(tmp_path):
     payload["runs"][0]["result"]["execution"]["default_parallelism"] = True
     with pytest.raises(ValueError, match="positive execution.default_parallelism"):
         validate_evidence(_write(tmp_path, payload))
+
+
+def test_evidence_validator_rejects_spark_version_drift_against_workflow_input(tmp_path, monkeypatch):
+    monkeypatch.setenv("SPARK_VALIDATION_VERSION", "3.5.8")
+    payload = _valid_payload()
+    payload["runs"][0]["result"]["execution"]["spark_version"] = "3.5.7"
+    with pytest.raises(ValueError, match="Spark version does not match SPARK_VALIDATION_VERSION"):
+        validate_evidence(_write(tmp_path, payload))
+
+
+def test_evidence_validator_accepts_matching_spark_version_against_workflow_input(tmp_path, monkeypatch):
+    monkeypatch.setenv("SPARK_VALIDATION_VERSION", "3.5.8")
+    validate_evidence(_write(tmp_path, _valid_payload()))
+
+
+@pytest.mark.parametrize("version", ["", "3.5 8", "x" * 65])
+def test_evidence_validator_rejects_invalid_expected_spark_version(tmp_path, monkeypatch, version):
+    monkeypatch.setenv("SPARK_VALIDATION_VERSION", version)
+    with pytest.raises(ValueError, match="SPARK_VALIDATION_VERSION"):
+        validate_evidence(_write(tmp_path, _valid_payload()))
