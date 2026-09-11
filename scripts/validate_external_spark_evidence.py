@@ -39,6 +39,10 @@ def validate_evidence(path: Path) -> dict:
         if not isinstance(runtime.get(key), str) or not runtime[key].strip():
             raise ValueError(f"evidence runtime.{key} is required")
 
+    target_fingerprint = data.get("target_fingerprint")
+    if not isinstance(target_fingerprint, str) or not HEX_SHA256_RE.fullmatch(target_fingerprint):
+        raise ValueError("evidence target_fingerprint must be a 64-character lowercase SHA-256")
+
     runs = data.get("runs")
     if not isinstance(runs, list) or not runs:
         raise ValueError("evidence must contain at least one run")
@@ -97,6 +101,7 @@ def validate_evidence(path: Path) -> dict:
 
     return {
         "source_revision": source_revision,
+        "target_fingerprint": target_fingerprint,
         "python_version": runtime["python_version"],
         "platform": runtime["platform"],
         "run_count": len(runs),
@@ -111,7 +116,8 @@ def main() -> None:
     summary = validate_evidence(args.path)
     print(
         "External Spark evidence provenance verified: "
-        f"revision={summary['source_revision']}, runs={summary['run_count']}, sizes={summary['sizes']}"
+        f"revision={summary['source_revision']}, target={summary['target_fingerprint']}, "
+        f"runs={summary['run_count']}, sizes={summary['sizes']}"
     )
 
 
