@@ -116,6 +116,8 @@ jobs:
               assert measurement['rows_per_second'] > 0
           print('External Spark evidence artifact verified.')
           PY
+      - name: Validate reusable evidence provenance
+        run: python scripts/validate_external_spark_evidence.py artifacts/external-spark.json
       - name: Summarize verified evidence
         run: |
           python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
