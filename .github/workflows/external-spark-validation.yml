@@ -49,17 +49,15 @@ jobs:
               raise SystemExit("HR_ANALYTICS_SPARK_MASTER must be spark://host:port")
           try:
               with socket.create_connection((parsed.hostname, parsed.port), timeout=5):
-                  print(f"Target Spark master TCP endpoint reachable: {parsed.hostname}:{parsed.port}")
+                  print("Target Spark master TCP endpoint is reachable.")
           except OSError as error:
               raise SystemExit(
-                  f"Target Spark master is not reachable from this runner at {parsed.hostname}:{parsed.port}: {error}"
+                  f"Target Spark master is not reachable from this runner: {error}"
               )
-          driver_host = os.environ.get("HR_ANALYTICS_SPARK_DRIVER_HOST", "").strip()
-          driver_bind = os.environ.get("HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS", "").strip()
-          if driver_host:
-              print(f"Configured Spark driver host: {driver_host}")
-          if driver_bind:
-              print(f"Configured Spark driver bind address: {driver_bind}")
+          if os.environ.get("HR_ANALYTICS_SPARK_DRIVER_HOST", "").strip():
+              print("Configured Spark driver host is present.")
+          if os.environ.get("HR_ANALYTICS_SPARK_DRIVER_BIND_ADDRESS", "").strip():
+              print("Configured Spark driver bind address is present.")
           print(f"Expected Spark/PySpark version: {os.environ['SPARK_VALIDATION_VERSION']}")
           PY
       - name: Install validation dependencies
