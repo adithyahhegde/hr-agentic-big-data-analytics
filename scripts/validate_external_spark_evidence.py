@@ -67,6 +67,10 @@ def validate_evidence(path: Path) -> dict:
         if target_fingerprint != expected_target_fingerprint:
             raise ValueError("evidence target_fingerprint does not match HR_ANALYTICS_SPARK_MASTER")
 
+    expected_spark_version = os.getenv("SPARK_VALIDATION_VERSION", "").strip()
+    if expected_spark_version and (len(expected_spark_version) > 64 or any(char.isspace() for char in expected_spark_version)):
+        raise ValueError("SPARK_VALIDATION_VERSION must be a non-whitespace Spark version string")
+
     runs = data.get("runs")
     if not isinstance(runs, list) or not runs:
         raise ValueError("evidence must contain at least one run")
@@ -121,6 +125,8 @@ def validate_evidence(path: Path) -> dict:
         spark_version = execution.get("spark_version")
         if not isinstance(spark_version, str) or not spark_version.strip():
             raise ValueError("each evidence run requires execution.spark_version")
+        if expected_spark_version and spark_version != expected_spark_version:
+            raise ValueError("evidence Spark version does not match SPARK_VALIDATION_VERSION")
         parallelism = execution.get("default_parallelism")
         if not isinstance(parallelism, int) or isinstance(parallelism, bool) or parallelism <= 0:
             raise ValueError("each evidence run requires positive execution.default_parallelism")
