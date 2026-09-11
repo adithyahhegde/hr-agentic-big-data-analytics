@@ -17,6 +17,7 @@ EXPECTED_MASTER_KIND = "spark"
 EXPECTED_INPUT_MODE = "driver_parallelized_csv"
 SOURCE_REVISION_RE = re.compile(r"[0-9a-f]{40}")
 HEX_SHA256_RE = re.compile(r"[0-9a-f]{64}")
+SPARK_VERSION_RE = re.compile(r"\d+\.\d+\.\d+(?:[-+._][0-9A-Za-z.-]+)?")
 
 
 def _finite_number(value, *, name: str) -> float:
@@ -65,8 +66,8 @@ def validate_evidence(path: Path) -> dict:
             raise ValueError("evidence target_fingerprint does not match HR_ANALYTICS_SPARK_MASTER")
 
     expected_spark_version = os.getenv("SPARK_VALIDATION_VERSION", "").strip()
-    if expected_spark_version and (len(expected_spark_version) > 64 or any(char.isspace() for char in expected_spark_version)):
-        raise ValueError("SPARK_VALIDATION_VERSION must be a non-whitespace Spark version string")
+    if expected_spark_version and not SPARK_VERSION_RE.fullmatch(expected_spark_version):
+        raise ValueError("SPARK_VALIDATION_VERSION must be a valid Spark version string")
 
     runs = data.get("runs")
     if not isinstance(runs, list) or not runs:
