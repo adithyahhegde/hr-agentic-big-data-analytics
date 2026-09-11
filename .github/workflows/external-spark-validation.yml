@@ -95,7 +95,9 @@ jobs:
           assert data['source_revision'] != 'unknown'
           assert isinstance(data['runtime']['python_version'], str) and data['runtime']['python_version']
           assert isinstance(data['runtime']['platform'], str) and data['runtime']['platform']
-          expected_version = os.environ['SPARK_VALIDATION_VERSION']
+          assert data['master_kind'] == 'spark'
+          configured_master = os.environ['HR_ANALYTICS_SPARK_MASTER'].strip()
+          assert configured_master
           for measurement in data['runs']:
               assert len(measurement['fixture_sha256']) == 64
               assert measurement['fixture_schema']
@@ -112,7 +114,7 @@ jobs:
               assert execution['default_parallelism'] > 0
               assert execution['application_id']
               assert execution['input_mode'] == 'driver_parallelized_csv'
-              assert measurement['elapsed_seconds'] >= 0
+              assert measurement['elapsed_seconds'] > 0
               assert measurement['rows_per_second'] > 0
           print('External Spark evidence artifact verified.')
           PY
