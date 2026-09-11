@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 from pathlib import Path
 
@@ -17,6 +18,12 @@ EXPECTED_SEED = 42
 EXPECTED_INPUT_MODE = "driver_parallelized_csv"
 
 
+def _finite_number(value: object, *, name: str) -> float:
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)):
+        raise ValueError(f"{name} must be a finite number")
+    return float(value)
+
+
 def validate_evidence(path: Path) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("protocol") != EXPECTED_PROTOCOL:
@@ -24,7 +31,7 @@ def validate_evidence(path: Path) -> dict:
     if data.get("seed") != EXPECTED_SEED:
         raise ValueError(f"evidence seed must be {EXPECTED_SEED}")
     sizes = data.get("sizes")
-    if not isinstance(sizes, list) or not sizes or any(not isinstance(size, int) or size <= 0 for size in sizes):
+    if not isinstance(sizes, list) or not sizes or any(not isinstance(size, int) or isinstance(size, bool) or size <= 0 for size in sizes):
         raise ValueError("evidence sizes must be a non-empty list of positive integers")
     if sizes != sorted(sizes) or len(sizes) != len(set(sizes)):
         raise ValueError("evidence sizes must be sorted and unique")
@@ -55,11 +62,11 @@ def validate_evidence(path: Path) -> dict:
             raise ValueError("each evidence run requires a 64-character lowercase fixture_sha256")
         if not isinstance(run.get("fixture_schema"), list) or not run["fixture_schema"]:
             raise ValueError("each evidence run requires a non-empty fixture_schema")
-        elapsed = run.get("elapsed_seconds")
-        throughput = run.get("rows_per_second")
-        if not isinstance(elapsed, (int, float)) or elapsed < 0:
+        elapsed = _finite_number(run.get("elapsed_seconds"), name="elapsed_seconds")
+        throughput = _finite_number(run.get("rows_per_second"), name="rows_per_second")
+        if elapsed < 0:
             raise ValueError("each evidence run requires non-negative elapsed_seconds")
-        if not isinstance(throughput, (int, float)) or throughput <= 0:
+        if throughput <= 0:
             raise ValueError("each evidence run requires positive rows_per_second")
 
         validation = run.get("validation")
@@ -92,12 +99,35 @@ def validate_evidence(path: Path) -> dict:
             raise ValueError("each evidence run requires execution provenance")
         if not isinstance(execution.get("spark_version"), str) or not execution["spark_version"].strip():
             raise ValueError("each evidence run requires execution.spark_version")
-        if not isinstance(execution.get("default_parallelism"), int) or execution["default_parallelism"] <= 0:
+        if not isinstance(execution.get("default_parallelism"), int) or isinstance(execution.get("default_parallelism"), bool) or execution["default_parallelism"] <= 0:
             raise ValueError("each evidence run requires positive execution.default_parallelism")
         if not isinstance(execution.get("application_id"), str) or not execution["application_id"].strip():
             raise ValueError("each evidence run requires execution.application_id")
         if execution.get("input_mode") != EXPECTED_INPUT_MODE:
             raise ValueError(f"evidence input_mode must be {EXPECTED_INPUT_MODE}")
+
+    scaling = data.get("scaling")
+    if not isinstance(scaling, dict):
+        raise ValueError("evidence scaling summary is required")
+    comparisons = scaling.get("adjacent_comparisons")
+    if not isinstance(comparisons, list) or len(comparisons) != max(0, len(runs) - 1):
+        raise ValueError("evidence scaling adjacent_comparisons must match the number of benchmark intervals")
+    for index, comparison in enumerate(comparisons):
+        if not isinstance(comparison, dict):
+            raise ValueError("each evidence scaling comparison must be an object")
+        expected_from = runs[index]["rows"]
+        expected_to = runs[index + 1]["rows"]
+        if comparison.get("from_rows") != expected_from or comparison.get("to_rows") != expected_to:
+            raise ValueError("evidence scaling comparison row bounds do not match benchmark runs")
+        for key in ("row_growth_factor", "elapsed_growth_factor", "throughput_growth_factor"):
+            value = _finite_number(comparison.get(key), name=f"scaling.{key}")
+            if value <= 0:
+                raise ValueError(f"scaling.{key} must be positive")
+    if len(runs) >= 2:
+        for key in ("largest_to_smallest_elapsed_ratio", "largest_to_smallest_throughput_ratio"):
+            value = _finite_number(scaling.get(key), name=f"scaling.{key}")
+            if value <= 0:
+                raise ValueError(f"scaling.{key} must be positive")
 
     return {
         "source_revision": source_revision,
@@ -106,6 +136,7 @@ def validate_evidence(path: Path) -> dict:
         "platform": runtime["platform"],
         "run_count": len(runs),
         "sizes": sizes,
+        "scaling_intervals": len(comparisons),
     }
 
 
@@ -117,7 +148,8 @@ def main() -> None:
     print(
         "External Spark evidence provenance verified: "
         f"revision={summary['source_revision']}, target={summary['target_fingerprint']}, "
-        f"runs={summary['run_count']}, sizes={summary['sizes']}"
+        f"runs={summary['run_count']}, sizes={summary['sizes']}, "
+        f"scaling_intervals={summary['scaling_intervals']}"
     )
 
 
