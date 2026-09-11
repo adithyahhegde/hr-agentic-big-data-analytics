@@ -8,6 +8,12 @@ import pytest
 from scripts.validate_external_spark_evidence import validate_evidence
 
 
+@pytest.fixture(autouse=True)
+def _clean_validation_environment(monkeypatch):
+    for name in ("GITHUB_SHA", "HR_ANALYTICS_SPARK_MASTER", "SPARK_VALIDATION_VERSION"):
+        monkeypatch.delenv(name, raising=False)
+
+
 def _write(tmp_path, payload):
     path = tmp_path / "evidence.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -43,13 +49,17 @@ def _valid_payload():
                 "result": {"execution": {"spark_version": "3.5.8", "default_parallelism": 2, "application_id": "app-test-1000", "input_mode": "driver_parallelized_csv"}},
             },
         ],
+        "scaling": {
+            "adjacent_comparisons": [
+                {"from_rows": 100, "to_rows": 1000, "row_growth_factor": 10.0, "elapsed_growth_factor": 2.0, "throughput_growth_factor": 5.0}
+            ],
+            "largest_to_smallest_elapsed_ratio": 2.0,
+            "largest_to_smallest_throughput_ratio": 5.0,
+        },
     }
 
 
 def test_evidence_validator_accepts_complete_contract(tmp_path, monkeypatch):
-    monkeypatch.delenv("GITHUB_SHA", raising=False)
-    monkeypatch.delenv("HR_ANALYTICS_SPARK_MASTER", raising=False)
-    monkeypatch.delenv("SPARK_VALIDATION_VERSION", raising=False)
     summary = validate_evidence(_write(tmp_path, _valid_payload()))
     assert summary["source_revision"] == "a" * 40
     assert summary["target_fingerprint"] == "d" * 64
@@ -65,7 +75,6 @@ def test_evidence_validator_rejects_source_revision_drift_against_github_sha(tmp
 
 def test_evidence_validator_accepts_matching_github_sha(tmp_path, monkeypatch):
     monkeypatch.setenv("GITHUB_SHA", "a" * 40)
-    monkeypatch.delenv("HR_ANALYTICS_SPARK_MASTER", raising=False)
     validate_evidence(_write(tmp_path, _valid_payload()))
 
 
@@ -80,7 +89,6 @@ def test_evidence_validator_accepts_matching_target_fingerprint(tmp_path, monkey
     master = "spark://cluster.example:7077"
     payload["target_fingerprint"] = hashlib.sha256(master.encode()).hexdigest()
     monkeypatch.setenv("HR_ANALYTICS_SPARK_MASTER", master)
-    monkeypatch.delenv("GITHUB_SHA", raising=False)
     validate_evidence(_write(tmp_path, payload))
 
 
@@ -226,3 +234,17 @@ def test_evidence_validator_rejects_invalid_expected_spark_version(tmp_path, mon
     monkeypatch.setenv("SPARK_VALIDATION_VERSION", version)
     with pytest.raises(ValueError, match="SPARK_VALIDATION_VERSION"):
         validate_evidence(_write(tmp_path, _valid_payload()))
+
+
+def test_evidence_validator_rejects_inconsistent_scaling_growth(tmp_path):
+    payload = _valid_payload()
+    payload["scaling"]["adjacent_comparisons"][0]["elapsed_growth_factor"] = 9.0
+    with pytest.raises(ValueError, match="elapsed_growth_factor does not match benchmark runs"):
+        validate_evidence(_write(tmp_path, payload))
+
+
+def test_evidence_validator_rejects_inconsistent_overall_scaling(tmp_path):
+    payload = _valid_payload()
+    payload["scaling"]["largest_to_smallest_throughput_ratio"] = 2.0
+    with pytest.raises(ValueError, match="largest_to_smallest_throughput_ratio does not match benchmark runs"):
+        validate_evidence(_write(tmp_path, payload))
